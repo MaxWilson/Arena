@@ -107,6 +107,7 @@ type Shape =
     static member inline onMouseDown (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseDown" f
     static member inline onMouseUp (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseUp" f
     static member inline onMouseOver (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseOver" f
+    static member inline onMouseMove (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseMove" f
     static member inline onMouseEnter (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseEnter" f
     static member inline onMouseLeave (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseLeave" f
     static member inline ref handle = mkShapeAttr "ref" handle
@@ -162,6 +163,7 @@ type Layer =
     static member inline children (children: #ReactElement list) = Layer.children (children |> Array.ofList)
     static member inline create children = layer [| Layer.children (children |> Array.ofList) |]
     static member inline createNamed keyName (children: #ReactElement list) = layer [| Layer.key keyName |> unbox; Layer.children (children |> Array.ofList) |]
+    static member inline createNamedP keyName (props: ILayerProperty seq) = layer [| Layer.key keyName |> unbox; yield! props |]
 
 type Stage =
     inherit Shape

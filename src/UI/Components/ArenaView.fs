@@ -14,38 +14,40 @@ module private Impl =
         let _scaleX, _scaleY = (float pixelWidth / 40.<yards>), (float pixelHeight / 40.<yards>)
         // hmmm, I guess we want to use the same scale for both X and Y don't we? Take the minimum and just let the other space go unused.
         let _scaleX, _scaleY = let m = min _scaleX _scaleY in m, m
-        member _.scaleX (x: float<yards>) = x * _scaleX
-        member _.unscaleX (x: float) = x / _scaleX
-        member _.scaleY (y: float<yards>) = y * _scaleY
-        member _.unscaleY (y: float) = y / _scaleY
-        member _.rect name (x:float<yards>,y:float<yards>) props =
+        member inline _.scaleX (x: float<yards>) = x * _scaleX
+        member inline _.unscaleX (x: float) = x / _scaleX
+        member inline _.scaleY (y: float<yards>) = y * _scaleY
+        member inline _.unscaleY (y: float) = y / _scaleY
+        member inline this.scale (x: float<yards>, y: float<yards>) = this.scaleX x, this.scaleY y
+        member inline this.unscale (x: float, y: float) = this.unscaleX x, this.unscaleY y
+        member inline _.rect name (x:float<yards>,y:float<yards>) props =
             Rect.create ([
                 Rect.x (x * _scaleX)
                 Rect.y (y * _scaleY)
                 Rect.key name
                 ]
                 @props)
-        member this.line name (points: (float<yards> * float<yards>) list) props =
+        member inline this.line name (points: (float<yards> * float<yards>) list) props =
             Line.create ([
                 Line.key name
                 Line.points (points |> List.collect (fun (x,y) -> [ this.scaleX x; this.scaleY y ]) |> Array.ofList)
                 ]
                 @props)
-        member _.circle name (x:float<yards>,y:float<yards>) props =
+        member inline _.circle name (x:float<yards>,y:float<yards>) props =
             Circle.create ([
                 Circle.x (x * _scaleX)
                 Circle.y (y * _scaleY)
                 Circle.key name
                 ]
                 @props)
-        member _.text name (x:float<yards>,y:float<yards>) props =
+        member inline _.text name (x:float<yards>,y:float<yards>) props =
             Text.create ([
                 Text.x (x * _scaleX)
                 Text.y (y * _scaleY)
                 Text.key name
                 ]
                 @props)
-        member _.group name (x:float<yards>,y:float<yards>) (props: IGroupProperty list) =
+        member inline _.group name (x:float<yards>,y:float<yards>) (props: IGroupProperty list) =
             Group.create (([
                 Group.x (x * _scaleX)
                 Group.y (y * _scaleY)
@@ -152,7 +154,24 @@ module Actual =
     let View (combatants: Combatant list) dispatch =
         let shownNames, setShownNames = React.useState Map.empty
         let hover, setHover = React.useState None
+        let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
         display (320, 320) <| fun r -> [
+            let inline nearest (x, y) =
+                let x, y = r.unscaleX x |> Ops.round, r.unscaleY y |> Ops.round
+                match nearestNeighborCache |> Map.tryFind (x, y) with
+                | Some ids -> ids
+                | None ->
+                    let distancesSquared =
+                        combatants
+                        |> List.map (fun c -> let cx, cy = c.coords in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
+                        |> List.sortBy snd
+                    match distancesSquared with
+                    | [] -> []
+                    | (closestId, distanceSquared)::rest ->
+                        // include anything that's reasonable close to the nearest thing if the pointer is also close to it
+                        let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
+                        setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
+                        ids
             Layer.createNamed "Background" [
                 Rect.create [
                     Rect.x 0
@@ -164,52 +183,54 @@ module Actual =
                     ]
                 ]
             layoutGrid r
-            Layer.createNamed "combatants" [
-                for c in combatants do
-                    Group.create ([
-                        let x,y = c.coords
-                        Group.x (r.scaleX x)
-                        Group.y (r.scaleY y)
-                        Group.key (toString c.Id)
-                        Group.onClick (fun e -> shownNames |> Map.change c.Id (function Some () -> None | None -> Some ()) |> setShownNames)
-                        Group.children [
-                            circle [
-                                Circle.radius (r.scaleX 0.5<yards>)
-                                Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
-                                Circle.key "outline"
-                                Circle.onMouseEnter (fun e ->
-                                    e.target.getStage().container().style.cursor <- CursorType.Pointer
-                                    setHover (Some c.Id))
-                                Circle.onMouseLeave (fun e ->
-                                    if hover = (Some c.Id) then
-                                        e.target.getStage().container().style.cursor <- CursorType.Default
-                                        setHover None
-                                    )
-                                if hover = Some c.Id then
-                                    Circle.stroke Color.Black
-                                    Circle.strokeWidth 2
-                                elif shownNames |> Map.containsKey c.Id then
-                                    Circle.stroke Color.Black
-                                    Circle.strokeWidth 1
-                                ]
-                            if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
-                                text [
-                                    Text.verticalAlign Middle
-                                    Text.align Center
-                                    Text.fill Color.Black
-                                    // do NOT scale text to yards
-                                    Text.autoWidth
-                                    Text.autoHeight
-                                    Text.offsetX (40)
-                                    Text.offsetY (35)
-                                    Text.fontSize 12
-                                    if hover = Some c.Id then Text.fontStyle "900" // unusually bold
-                                    else Text.fontStyle "bold"
-                                    Text.key "name"
-                                    Text.text c.personalName
+            Layer.createNamedP "combatants" [
+                Layer.children [
+                    for c in combatants do
+                        Group.create ([
+                            let x,y = c.coords
+                            Group.x (r.scaleX x)
+                            Group.y (r.scaleY y)
+                            Group.key (toString c.Id)
+                            Group.onClick (fun e -> shownNames |> Map.change c.Id (function Some () -> None | None -> Some ()) |> setShownNames)
+                            Group.children [
+                                circle [
+                                    Circle.radius (r.scaleX 0.5<yards>)
+                                    Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
+                                    Circle.key "outline"
+                                    Circle.onMouseOver (fun e ->
+                                        e.target.getStage().container().style.cursor <- CursorType.Pointer
+                                        setHover (Some c.Id))
+                                    Circle.onMouseLeave (fun e ->
+                                        if hover = (Some c.Id) then
+                                            e.target.getStage().container().style.cursor <- CursorType.Default
+                                            setHover None
+                                        )
+                                    if hover = Some c.Id then
+                                        Circle.stroke Color.Black
+                                        Circle.strokeWidth 2
+                                    elif shownNames |> Map.containsKey c.Id then
+                                        Circle.stroke Color.Black
+                                        Circle.strokeWidth 1
                                     ]
-                            ]
-                        ]: IGroupProperty list)
+                                if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
+                                    text [
+                                        Text.verticalAlign Middle
+                                        Text.align Center
+                                        Text.fill Color.Black
+                                        // do NOT scale text to yards
+                                        Text.autoWidth
+                                        Text.autoHeight
+                                        Text.offsetX (40)
+                                        Text.offsetY (35)
+                                        Text.fontSize 12
+                                        if hover = Some c.Id then Text.fontStyle "900" // unusually bold
+                                        else Text.fontStyle "bold"
+                                        Text.key "name"
+                                        Text.text c.personalName
+                                        ]
+                                ]
+                            ]: IGroupProperty list)
+                    ]
                 ]
             ]
 
