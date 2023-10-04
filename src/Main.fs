@@ -37,7 +37,7 @@ let Router() =
                             classP' "internalLink" Html.a [prop.href ("#" + dest); prop.children [Html.text link]; prop.custom("data-text", link); prop.onClick (fun ev -> ev.preventDefault(); notImpl $"{link} mode" )]
                         else classP' "internalLink" Html.a [prop.href ("#" + dest); prop.children [Html.text link]; prop.custom("data-text", link) ]
                     classP' "srcLink" Html.a [
-                        prop.href "https://github.com/MaxWilson/POCArena/"
+                        prop.href "https://github.com/MaxWilson/Arena/"
                         prop.children [Html.img [prop.ariaLabel "GitHub"; prop.src "img/GitHub_Logo.png"]]
                         prop.target "_blank"
                         ]
