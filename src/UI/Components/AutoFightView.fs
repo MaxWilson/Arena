@@ -554,6 +554,7 @@ let View (model: Model) dispatch =
                                     ]
                             ]
                         let notifyTeamMoved ((isTeamA, groupIx), (x: float<yards>, y: float<yards>)) =
+                            let x, y = Ops.round x, Ops.round y
                             let changeTeamSetup (f: FightSetup) =
                                 match isTeamA, f.sideB with
                                 | true, _ ->
