@@ -171,6 +171,7 @@ module Actual =
                         // include anything that's reasonable close to the nearest thing if the pointer is also close to it
                         let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
                         setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
+                        printfn $"Near {(x,y)}: {ids} at about {sqrt distanceSquared}"
                         ids
             Layer.createNamed "Background" [
                 Rect.create [
@@ -184,6 +185,12 @@ module Actual =
                 ]
             layoutGrid r
             Layer.createNamedP "combatants" [
+                Layer.onMouseMove(fun e ->
+                    match nearest (e.target.x(), e.target.y()) with
+                    | [] as v when hover <> None -> setHover None
+                    | h::_ when hover <> Some h -> setHover (Some h)
+                    | _ -> ()
+                    )
                 Layer.children [
                     for c in combatants do
                         Group.create ([
@@ -197,14 +204,14 @@ module Actual =
                                     Circle.radius (r.scaleX 0.5<yards>)
                                     Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
                                     Circle.key "outline"
-                                    Circle.onMouseOver (fun e ->
-                                        e.target.getStage().container().style.cursor <- CursorType.Pointer
-                                        setHover (Some c.Id))
-                                    Circle.onMouseLeave (fun e ->
-                                        if hover = (Some c.Id) then
-                                            e.target.getStage().container().style.cursor <- CursorType.Default
-                                            setHover None
-                                        )
+                                    // Circle.onMouseOver (fun e ->
+                                    //     e.target.getStage().container().style.cursor <- CursorType.Pointer
+                                    //     setHover (Some c.Id))
+                                    // Circle.onMouseLeave (fun e ->
+                                    //     if hover = (Some c.Id) then
+                                    //         e.target.getStage().container().style.cursor <- CursorType.Default
+                                    //         setHover None
+                                    //     )
                                     if hover = Some c.Id then
                                         Circle.stroke Color.Black
                                         Circle.strokeWidth 2
@@ -218,15 +225,18 @@ module Actual =
                                         Text.align Center
                                         Text.fill Color.Black
                                         // do NOT scale text to yards
-                                        Text.autoWidth
-                                        Text.autoHeight
-                                        Text.offsetX (40)
-                                        Text.offsetY (35)
+                                        // do NOT scale text to yards
+                                        let label = c.personalName
+                                        let textWidth = label.Length * 6
+                                        Text.width textWidth
+                                        Text.offsetX (textWidth / 2 |> float)
+                                        Text.height 20
+                                        Text.offsetY 10.
                                         Text.fontSize 12
                                         if hover = Some c.Id then Text.fontStyle "900" // unusually bold
                                         else Text.fontStyle "bold"
                                         Text.key "name"
-                                        Text.text c.personalName
+                                        Text.text label
                                         ]
                                 ]
                             ]: IGroupProperty list)

@@ -163,7 +163,7 @@ type Layer =
     static member inline children (children: #ReactElement list) = Layer.children (children |> Array.ofList)
     static member inline create children = layer [| Layer.children (children |> Array.ofList) |]
     static member inline createNamed keyName (children: #ReactElement list) = layer [| Layer.key keyName |> unbox; Layer.children (children |> Array.ofList) |]
-    static member inline createNamedP keyName (props: ILayerProperty seq) = layer [| Layer.key keyName |> unbox; yield! props |]
+    static member inline createNamedP keyName (props: ILayerProperty seq) = layer [| yield! props; Layer.key keyName |> unbox |]
 
 type Stage =
     inherit Shape
