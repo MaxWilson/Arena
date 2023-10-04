@@ -95,7 +95,7 @@ let beginFights (model: Model) dispatch =
                 let max = (defaultArg max 90 |> float) / 100.
                 match! calibrate model.database.catalog
                         model.fightSetup.sideA
-                        (sideB.center, (defaultArg sideB.radius 10.<yards>), name, min, max, defeatCriteria) with
+                        (sideB.center, sideB.radius, name, min, max, defeatCriteria) with
                 | minQuantity, maxQuantity, Some sampleMaxFight ->
                     Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
                 | v ->

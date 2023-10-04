@@ -295,10 +295,10 @@ module Team =
     let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
     let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
 
-let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance, enemyType, minbound, maxbound, defeatCriteria) = async {
+let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
     let runForN n = async {
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
-        let combat = createCombat db team1 (Team.fresh [n, enemyType ]) // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
+        let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
         let cqrs = CQRS.CQRS.Create(combat, update)
         return cqrs, fight cqrs
         }
