@@ -110,6 +110,7 @@ img, picture, svg, video
                     margin-left: 3px
     .combat
         display: grid
+        grid-template-rows: auto 1fr auto
         grid-template-columns: auto 1fr
         grid-template-areas: "statusTable logButtons" "statusTable logEntries" "visuals visuals"
         @media (min-width: 800px)
@@ -121,7 +122,7 @@ img, picture, svg, video
             background-color: darkgray
         .statusTable
             grid-area: statusTable
-            max-height: 45vh
+            max-height: 55vh
             overflow-y: auto
             table
                 min-width: 25vw
@@ -137,7 +138,7 @@ img, picture, svg, video
                 left: 5px
         .logEntries
             grid-area: logEntries
-            max-height: calc(45vh - 30px) // ugh, how to make this responsive? And shorter; it is running off the page right now and it looks ugly.
+            max-height: calc(55vh - 30px) // ugh, how to make this responsive? And shorter; it is running off the page right now and it looks ugly.
             overflow-y: auto
             .details
                 margin-left: 8px
