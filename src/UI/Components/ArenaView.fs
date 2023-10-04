@@ -176,7 +176,7 @@ module Actual =
                         let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
                         setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
                         ids
-            Stage.onMouseMove(fun e ->
+            let showClosestMonster _ =
                 match stageRef.current with
                 | None -> ()
                 | Some ref ->
@@ -185,7 +185,9 @@ module Actual =
                     | [] as v when hover <> None -> setHover None
                     | h::_ when hover <> Some h -> setHover (Some h)
                     | _ -> ()
-                )
+            Stage.onMouseMove showClosestMonster
+            Stage.onTouchStart showClosestMonster
+            Stage.onTouchMove showClosestMonster
             ]
         display (320, 320) stageProps <| fun r -> [
             Layer.createNamed "Background" [
