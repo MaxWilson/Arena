@@ -129,10 +129,11 @@ module private Setup =
                                 Text.align Center
                                 Text.fill Color.Black
                                 // do NOT scale text to yards
-                                Text.width (200)
-                                Text.height (50)
-                                Text.offsetX (100)
-                                Text.offsetY (25)
+                                let textWidth = label.Length * 6
+                                Text.width textWidth
+                                Text.offsetX (textWidth / 2 |> float)
+                                Text.height 20
+                                Text.offsetY (let r = r.scaleX radius in if float textWidth < r * 2.5 then 10. else 15. + r) // if the circle is big enough, e.g. "N Orcs", center inside it. But if the label is bigger than the circle, offset it above.
                                 Text.fontSize 9
                                 Text.fontStyle "800" // unusually bold
                                 Text.key "name1"
@@ -197,9 +198,9 @@ module Actual =
                                     Text.align Center
                                     Text.fill Color.Black
                                     // do NOT scale text to yards
-                                    Text.width (120)
-                                    Text.height (50)
-                                    Text.offsetX (60)
+                                    Text.autoWidth
+                                    Text.autoHeight
+                                    Text.offsetX (40)
                                     Text.offsetY (35)
                                     Text.fontSize 12
                                     if hover = Some c.Id then Text.fontStyle "900" // unusually bold
