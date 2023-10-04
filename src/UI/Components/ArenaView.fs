@@ -55,7 +55,8 @@ module private Impl =
                 ] : IGroupProperty list)
                 @ props)
     let toYard(x:int) = float x * 1.<yards>
-    let display (pixelSize: int * int) render =
+    let display (pixelSize: int * int) stageProps render =
+        let renderHelper = (RenderHelper(pixelSize))
         stage [
             Stage.height (snd pixelSize)
             Stage.width (fst pixelSize)
@@ -70,8 +71,9 @@ module private Impl =
                         Rect.key "Rect1"
                         ]
                     ]
-                yield! render (RenderHelper(pixelSize))
+                yield! render renderHelper
                 ]
+            yield! stageProps renderHelper
             ]
     let layoutGrid (r: RenderHelper) =
         Layer.createNamed "Grid" [
@@ -96,7 +98,7 @@ module private Setup =
 
     [<ReactComponent>]
     let View (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
-        display (320, 320) <| fun r -> [
+        display (320, 320) (thunk []) <| fun r -> [
             layoutGrid r
             Layer.createNamed "teams" [
                 let groups = [
@@ -155,7 +157,9 @@ module Actual =
         let shownNames, setShownNames = React.useState Map.empty
         let hover, setHover = React.useState None
         let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
-        display (320, 320) <| fun r -> [
+        let stageRef = React.useRef None
+        let stageProps (r: RenderHelper) = [
+            Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r) :> IStageProperty
             let inline nearest (x, y) =
                 let x, y = r.unscaleX x |> Ops.round, r.unscaleY y |> Ops.round
                 match nearestNeighborCache |> Map.tryFind (x, y) with
@@ -171,8 +175,19 @@ module Actual =
                         // include anything that's reasonable close to the nearest thing if the pointer is also close to it
                         let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
                         setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
-                        printfn $"Near {(x,y)}: {ids} at about {sqrt distanceSquared}"
                         ids
+            Stage.onMouseMove(fun e ->
+                match stageRef.current with
+                | None -> ()
+                | Some ref ->
+                    let x, y = let c = ref.getPointerPosition() in c.x, c.y
+                    match nearest (x,y) with
+                    | [] as v when hover <> None -> setHover None
+                    | h::_ when hover <> Some h -> setHover (Some h)
+                    | _ -> ()
+                )
+            ]
+        display (320, 320) stageProps <| fun r -> [
             Layer.createNamed "Background" [
                 Rect.create [
                     Rect.x 0
@@ -184,15 +199,11 @@ module Actual =
                     ]
                 ]
             layoutGrid r
-            Layer.createNamedP "combatants" [
-                Layer.onMouseMove(fun e ->
-                    match nearest (e.target.x(), e.target.y()) with
-                    | [] as v when hover <> None -> setHover None
-                    | h::_ when hover <> Some h -> setHover (Some h)
-                    | _ -> ()
-                    )
+            Layer.create [
+                Layer.key "Combatants" :> ILayerProperty
                 Layer.children [
-                    for c in combatants do
+                    // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
+                    for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
                         Group.create ([
                             let x,y = c.coords
                             Group.x (r.scaleX x)
@@ -220,19 +231,28 @@ module Actual =
                                         Circle.strokeWidth 1
                                     ]
                                 if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
-                                    text [
+                                    let label = c.personalName
+                                    let textWidth = label.Length * 14
+                                    Rect.create [
+                                        Rect.key "hoverBackground"
+                                        Rect.width textWidth
+                                        Rect.offsetX (textWidth / 2 |> float)
+                                        Rect.height 20
+                                        Rect.offsetY 22.
+                                        Rect.fill Color.White
+                                        Rect.stroke Color.Black
+                                        Rect.strokeWidth 2
+                                        ]
+                                    Text.create [
                                         Text.verticalAlign Middle
                                         Text.align Center
                                         Text.fill Color.Black
                                         // do NOT scale text to yards
-                                        // do NOT scale text to yards
-                                        let label = c.personalName
-                                        let textWidth = label.Length * 6
                                         Text.width textWidth
                                         Text.offsetX (textWidth / 2 |> float)
                                         Text.height 20
-                                        Text.offsetY 10.
-                                        Text.fontSize 12
+                                        Text.offsetY 20.
+                                        Text.fontSize 18
                                         if hover = Some c.Id then Text.fontStyle "900" // unusually bold
                                         else Text.fontStyle "bold"
                                         Text.key "name"

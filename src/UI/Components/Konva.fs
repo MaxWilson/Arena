@@ -47,6 +47,9 @@ type Container =
     abstract style: Style
 
 [<Erase>]
+type KonvaCoords = { x: float; y: float }
+
+[<Erase>]
 type KonvaNode = // the actual underlying Konva node which the React layers (below) create.
     abstract x : unit -> float
     abstract x : float -> unit
@@ -56,6 +59,9 @@ type KonvaNode = // the actual underlying Konva node which the React layers (bel
 and StageNode =
     inherit KonvaNode
     abstract container: unit -> Container
+    abstract getPointerPosition: unit -> KonvaCoords
+and LayerNode =
+    inherit KonvaNode
 
 [<AutoOpen>]
 module private Interop =
@@ -78,7 +84,7 @@ module private Interop =
     let inline text (props: ITextProperty array) = Interop.reactApi.createElement(import "Text" "react-konva", createObj !!props)
 
 [<Erase>]
-type Color = Red | Green | Blue | Yellow | Grey | Orange | Purple | LightGrey | DarkGrey | Black
+type Color = White | Red | Green | Blue | Yellow | Grey | Orange | Purple | LightGrey | DarkGrey | Black
 
 type Shape =
     static member inline key (key:_) = mkShapeAttr "key" key
@@ -161,9 +167,9 @@ type Layer =
     inherit Shape
     static member inline children (children: #ReactElement array) = mkLayerAttr "children" children
     static member inline children (children: #ReactElement list) = Layer.children (children |> Array.ofList)
+    static member inline create (props: ILayerProperty list) = layer (Array.ofList props)
     static member inline create children = layer [| Layer.children (children |> Array.ofList) |]
     static member inline createNamed keyName (children: #ReactElement list) = layer [| Layer.key keyName |> unbox; Layer.children (children |> Array.ofList) |]
-    static member inline createNamedP keyName (props: ILayerProperty seq) = layer [| yield! props; Layer.key keyName |> unbox |]
 
 type Stage =
     inherit Shape
