@@ -94,7 +94,7 @@ module private Setup =
 
     [<ReactComponent>]
     let View (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
-        display (300, 300) <| fun r -> [
+        display (320, 320) <| fun r -> [
             layoutGrid r
             Layer.createNamed "teams" [
                 let groups = [
@@ -129,9 +129,9 @@ module private Setup =
                                 Text.align Center
                                 Text.fill Color.Black
                                 // do NOT scale text to yards
-                                Text.width (50)
+                                Text.width (200)
                                 Text.height (50)
-                                Text.offsetX (25)
+                                Text.offsetX (100)
                                 Text.offsetY (25)
                                 Text.fontSize 9
                                 Text.fontStyle "800" // unusually bold
@@ -151,7 +151,7 @@ module Actual =
     let View (combatants: Combatant list) dispatch =
         let shownNames, setShownNames = React.useState Map.empty
         let hover, setHover = React.useState None
-        display (300, 300) <| fun r -> [
+        display (320, 320) <| fun r -> [
             Layer.createNamed "Background" [
                 Rect.create [
                     Rect.x 0
