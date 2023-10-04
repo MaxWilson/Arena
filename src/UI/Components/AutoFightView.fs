@@ -289,11 +289,12 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
             Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
             Html.button [prop.text ">>"; prop.onClick nextRound]
-            React.useListener.onKeyDown(fun ev ->
-                if ev.key = ">" || ev.key = "ArrowRight" then ev.preventDefault(); nextRound()
-                elif ev.key = "<" || ev.key = "ArrowLeft" then ev.preventDefault(); priorRound()
-                elif ev.key = "ArrowDown" then ev.preventDefault(); changeIndex +1 ()
-                elif ev.key = "ArrowUp" then ev.preventDefault(); changeIndex -1 ()
+            React.useWindowListener.onKeyDown(fun ev ->
+                if Browser.Dom.window.document.activeElement.tagName <> "INPUT" then // this is a kludge but we don't want to prevent user from moving around inside an input element (e.g. setting how many peshkalis)
+                    if ev.key = ">" || ev.key = "ArrowRight" then ev.preventDefault(); nextRound()
+                    elif ev.key = "<" || ev.key = "ArrowLeft" then ev.preventDefault(); priorRound()
+                    elif ev.key = "ArrowDown" then ev.preventDefault(); changeIndex +1 ()
+                    elif ev.key = "ArrowUp" then ev.preventDefault(); changeIndex -1 ()
                 )
             checkbox Html.span "Show rolls" (showRolls, setShowRolls)
             ]
