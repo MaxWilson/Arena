@@ -83,7 +83,6 @@ let beginFights (model: Model) dispatch =
         let g = System.Guid.NewGuid()
         Fight InProgress |> dispatch
         async {
-            do! Async.Sleep 100 // force async to yield long enough for the busy animation to show up--I'm not sure why but it doesn't happen sometimes otherwise
             match model.fightSetup.sideB with
             | _ when (model.fightSetup.sideA |> List.every (fun group -> group.members |> List.sumBy fst = 0)) ->
                 Fight NotStarted |> dispatch
@@ -108,4 +107,4 @@ let beginFights (model: Model) dispatch =
                     |> Completed
                     |> Fight
                     |> dispatch
-            } |> Async.StartImmediate |> ignore
+            } |> Async.StartAsPromise |> ignore

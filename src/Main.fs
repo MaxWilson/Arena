@@ -67,6 +67,7 @@ module ReactErrorBoundary =
     let WindowProtector(child) =
         let error, setError = React.useState None
         React.useWindowListener.onError(fun (ev: Browser.Types.UIEvent) -> setError (Some (ev?message)))
+        React.useWindowListener.onUnhandledRejection(fun (ev: Browser.Types.PromiseRejectionEvent) -> setError (Some (ev.reason)))
         match error with
         | Some error ->
             class' "error" Html.div [
