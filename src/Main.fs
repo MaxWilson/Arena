@@ -2,7 +2,7 @@ module Main
 
 open Feliz
 open Feliz.Router
-open Feliz.UseListener
+open Feliz.Listeners
 open UI.Components.Sample
 open UI.Components.AutoFightView
 open UI.Components.Arena

@@ -7,7 +7,7 @@ open Domain
 open Domain.CombatRules
 open Domain.Random
 open Domain.Random.Parser
-open Feliz.UseListener
+open Feliz.Listeners
 open UI.Components.AutoFight
 
 [<ReactComponent>]

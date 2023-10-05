@@ -32,7 +32,7 @@ open Domain
 open Domain.CombatRules
 open Domain.Random
 open Domain.Random.Parser
-open Feliz.UseListener
+open Feliz.Listeners
 
 [<Emit("$0.scrollIntoView({block: 'nearest', inline: 'nearest'})")>]
 let scrollIntoView (element: Browser.Types.Node) = jsNative
