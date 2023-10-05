@@ -144,19 +144,19 @@ module ExecuteAction =
     let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
         let rec attempt (behavior as unchanged) =
-            match (behavior(feedback, getCtx())) with
+            let ctx = getCtx()
+            match (behavior(feedback, ctx)) with
             | Finished () -> None
             | AwaitingAction(Yield, behavior) -> Some behavior // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
             | AwaitingAction(Attack(details), followup) ->
-                let ctx = getCtx()
-                if ctx.me_.attackBudget = 0 then Some unchanged // illegal to attack right now; block until an attack is available, so we can retry the behavior next round
+                let me = ctx.me_
+                if me.maneuverBudget = 0 && ctx.me_.attackBudget = 0 then Some unchanged // illegal to attack right now; block until an attack is available, so we can retry the behavior next round
                 else
                     doAttack cqrsExecute ctx details
                     attempt followup
             | AwaitingAction(Move(pos), followup) ->
-                let ctx = getCtx()
-                // check that we have enough movement points/maneuvers available...
                 let me = ctx.me_
+                // check that we have enough movement points/maneuvers available...
                 if me.maneuverBudget = 0 && me.movementBudget = 0 && me.stepBudget = 0 then Some unchanged // can't move right now; block until next turn
                 else
                     // then cqrsExecute the appropriate commands
