@@ -10,9 +10,9 @@ module CombatEvents =
         let purchaseAttacks (c: Combatant) =
             if c.attackBudget > 0 then c
             elif c.maneuverBudget > 0 then { c with maneuverBudget = c.maneuverBudget - 1; attackBudget = c.stats.ExtraAttack_ + 1 }
-            else shouldntHappen() // maybe there's a better way to signal this, but we should also catch this between the behavior action request and this update function, so this shouldn't happen.
+            else shouldntHappen "Insufficient attacks" // maybe there's a better way to signal this, but we should also catch this between the behavior action request and this update function, so this shouldn't happen.
         let consumeManeuver id =
-            updateCombatant id (fun c -> if c.maneuverBudget = 0 then shouldntHappen() else { c with maneuverBudget = c.maneuverBudget - 1 })
+            updateCombatant id (fun c -> if c.maneuverBudget = 0 then shouldntHappen "Insufficient maneuvers" else { c with maneuverBudget = c.maneuverBudget - 1 })
         let consumeAttack id =
             updateCombatant id (fun c -> let c = purchaseAttacks c in { c with attackBudget = c.attackBudget - 1 })
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
@@ -160,6 +160,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
         let mutable doneEarly = false
         let attacker = cqrs.State.combatants[c]
+        NewTurn attacker.Id |> cqrs.Execute
         if attacker.isnt [Dead; Unconscious] then
             if attacker.is Stunned then
                 if attempt "Recover from stun" attacker.stats.HT_ then
