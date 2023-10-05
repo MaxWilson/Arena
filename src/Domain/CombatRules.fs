@@ -41,6 +41,8 @@ module CombatEvents =
                     })
         match msg with
         | Unlogged(NewTurn id) -> model |> newTurn id
+        | Unlogged(SetBehavior (id, None)) -> { model with behaviors = model.behaviors |> Map.remove id }
+        | Unlogged(SetBehavior (id, Some bhv)) -> { model with behaviors = model.behaviors |> Map.add id bhv }
         | Logged msg ->
             match msg with
             | Hit (ids, defense, injury, statusImpact, rollDetails) ->
@@ -132,37 +134,35 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
     else false
 
 module ExecuteAction =
-    let attack (cqrsExecute: _ -> unit) (ctx: ActionContext) (details: AttackDetails) =
+    open Coroutine
+    let doAttack (cqrsExecute: _ -> unit) (ctx: ActionContext) (details: AttackDetails) =
         notImpl "cqrsExecute a bunch of stuff"
         ()
-    let move = notImpl
+    let doMove = notImpl
 
-let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) ((action, behavior) as input) : (Action * ActionBehavior) option =
-    let continue'() =
-        match (behavior((), getCtx())) with
-        | Coroutine.Finished () -> None
-        | Coroutine.AwaitingAction(Yield, behavior) -> Some(Yield, behavior) // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
-        | Coroutine.AwaitingAction(action, behavior) ->
-            iterateBehavior cqrsExecute getCtx (action, behavior)  // feedback will probably be more than just unit eventually, after we have our log system in place
-    match action with
-    | Attack(details) ->
-        let ctx = getCtx()
-        if ctx.me_.attackBudget = 0 then Some input // change nothing, block until an attack is available
-        else
-            ExecuteAction.attack cqrsExecute ctx details
-            continue'()
-    | Move(pos) ->
-        let ctx = getCtx()
-        // check that we have enough movement points/maneuvers available...
-        let me = ctx.me_
-        if me.maneuverBudget = 0 && me.movementBudget = 0 && me.stepBudget = 0 then Some input // change nothing, block until a maneuver is available
-        else
-            // then cqrsExecute the appropriate commands
-            // cqrsExecute a bunch of stuff and then...
-            ExecuteAction.move cqrsExecute ctx pos
-            continue'()
-    | Yield ->
-        continue'()
+    let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
+        let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
+        let rec attempt (behavior as unchanged) =
+            match (behavior(feedback, getCtx())) with
+            | Finished () -> None
+            | AwaitingAction(Yield, behavior) -> Some behavior // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
+            | AwaitingAction(Attack(details), followup) ->
+                let ctx = getCtx()
+                if ctx.me_.attackBudget = 0 then Some unchanged // illegal to attack right now; block until an attack is available, so we can retry the behavior next round
+                else
+                    doAttack cqrsExecute ctx details
+                    attempt followup
+            | AwaitingAction(Move(pos), followup) ->
+                let ctx = getCtx()
+                // check that we have enough movement points/maneuvers available...
+                let me = ctx.me_
+                if me.maneuverBudget = 0 && me.movementBudget = 0 && me.stepBudget = 0 then Some unchanged // can't move right now; block until next turn
+                else
+                    // then cqrsExecute the appropriate commands
+                    // cqrsExecute a bunch of stuff and then...
+                    doMove cqrsExecute ctx pos
+                    attempt followup
+        attempt behavior
 
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
     // HIGH speed and DX goes first so we use the negative of those values
@@ -206,8 +206,13 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                     Info(attacker.Id, "does nothing", msg)
                 |> loggedExecute
             elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious (attacker, attacker.is Berserk) 0 then
-                FallUnconscious(attacker.Id, msg)
+                FallUnconscious(attacker.Id, msg) // TODO: move this into the ExecuteAction logic, but do it only once per turn
                 |> loggedExecute
+            elif cqrs.State.behaviors.ContainsKey attacker.Id then
+                let behavior = cqrs.State.behaviors[attacker.Id]
+                let getCtx() = { combat = cqrs.State; me = attacker.Id }
+                SetBehavior(attacker.Id, ExecuteAction.iterateBehavior loggedExecute getCtx behavior) |> silentExecute
+            // this other stuff needs to get refactored into the behavior system
             elif attacker.is Prone then
                 StandUp(attacker.Id, msg)
                 |> loggedExecute

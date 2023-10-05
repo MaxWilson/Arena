@@ -325,6 +325,7 @@ module Data =
             | NewRound of int
         type HouseKeeping =
             | NewTurn of CombatantId
+            | SetBehavior of CombatantId * ActionBehavior option
         type Event = Logged of Logged | Unlogged of HouseKeeping
     type CombatFullLog = (Event option * Combat) list
     type CombatLog = (Logged option * Combat) list
