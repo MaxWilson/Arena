@@ -218,7 +218,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
     let combat, setCombat = React.useState (combatLog |> List.last |> snd)
     let currentIndex, setCurrentIndex = React.useState 0
     class' "combat" Html.div [
-        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq) dispatch]
+        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, combat.positions) dispatch]
         class' "statusTable" Html.div [
             Html.table [
                 Html.thead [
@@ -356,7 +356,8 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
 
 [<ReactComponent>]
 let ExecuteButton (model:Model) dispatch =
-    if model.execution = InProgress then
+    match model.execution with
+    | InProgress ->
         class' "fadeIn" Html.div [
             Html.div "Executing..."
             class' "busy" Html.div [
@@ -364,7 +365,7 @@ let ExecuteButton (model:Model) dispatch =
                     class' "wave" Html.div []
                 ]
             ]
-    else
+    | _ ->
         React.useListener.onKeyDown(fun ev ->
             if ev.key = "Enter" && ev.ctrlKey then ev.preventDefault(); beginFights model dispatch
             )

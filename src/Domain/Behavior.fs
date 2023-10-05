@@ -2,8 +2,6 @@ module Domain.Behavior
 
 open Coroutine
 
-type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
-type ActionBehavior = Behavior<Action, unit, ActionContext, unit>
 let behavior = BehaviorBuilder()
 
 let prioritizeTargets (combat: Combat) (attacker: Combatant) =

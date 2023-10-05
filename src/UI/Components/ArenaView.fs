@@ -153,7 +153,7 @@ let Setup = Setup.View
 module Actual =
 
     [<ReactComponent>]
-    let View (combatants: Combatant list) dispatch =
+    let View (combatants: Combatant list, positions: Map<CombatantId, Coords>) dispatch =
         let shownNames, setShownNames = React.useState Map.empty
         let hover, setHover = React.useState None
         let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
@@ -167,7 +167,7 @@ module Actual =
                 | None ->
                     let distancesSquared =
                         combatants
-                        |> List.map (fun c -> let cx, cy = c.coords in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
+                        |> List.map (fun c -> let cx, cy = positions[c.Id] in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
                         |> List.sortBy snd
                     match distancesSquared with
                     | [] -> []
@@ -207,7 +207,7 @@ module Actual =
                     // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
                     for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
                         Group.create ([
-                            let x,y = c.coords
+                            let x,y = positions[c.Id]
                             Group.x (r.scaleX x)
                             Group.y (r.scaleY y)
                             Group.key (toString c.Id)

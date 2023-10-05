@@ -76,9 +76,10 @@ let init () =
     { page = Home; fightSetup = fight; database = db; execution = NotStarted }
 
 let beginFights (model: Model) dispatch =
-    if model.execution = InProgress then
+    match model.execution with
+    | InProgress ->
         ()
-    else
+    | _ ->
         let g = System.Guid.NewGuid()
         Fight InProgress |> dispatch
         async {

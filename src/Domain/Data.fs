@@ -249,12 +249,11 @@ module Data =
         parriesUsed: int
         attacksUsed: int
         rapidStrikeUsed: bool
-        coords: Coords
         }
         with
         member this.CurrentHP_ = this.stats.HP_ - this.injuryTaken
         member this.Id : CombatantId = this.team, this.personalName
-        static member fresh (team, name, number, coords, stats: Creature) =
+        static member fresh (team, name, number, stats: Creature) =
             {   team = team
                 personalName = name
                 number = number
@@ -267,7 +266,6 @@ module Data =
                 parriesUsed = 0
                 attacksUsed = 0
                 rapidStrikeUsed = false
-                coords = coords
                 }
         member this.is (status: Status) = this.statusMods |> List.exists ((=) status)
         member this.isAny (statuses: Status list) = this.statusMods |> List.includes statuses
@@ -284,8 +282,12 @@ module Data =
                 shockPenalty = 0
                 }
 
-    type Combat = {
+    type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
+    and ActionBehavior = Coroutine.Behavior<Action, unit, ActionContext, unit>
+    and Combat = {
         combatants: Map<CombatantId, Combatant>
+        positions: Map<CombatantId, Coords>
+        behaviors: Map<CombatantId, ActionBehavior>
         }
     type Ids =
         { attacker: CombatantId; target: CombatantId }
@@ -311,8 +313,7 @@ module Data =
             | NewRound of int
         let update msg model =
             let updateCombatant id (f: Combatant -> Combatant) model =
-                {   combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None)
-                    }
+                {   model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
             let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
                 updateCombatant id (fun c ->
                     match defense with

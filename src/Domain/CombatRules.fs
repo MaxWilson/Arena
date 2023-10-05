@@ -237,7 +237,7 @@ let radius_ (group:GroupSetup) =
         let memberCount = group.members |> List.sumBy fst
         1.0<yards> * (sqrt (float memberCount))
 
-let toCombatants (db: Map<string, Creature>) teamNumber positioner =
+let toCombatants (db: Map<string, Creature>) teamNumber project =
     // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
     let mutable counter = 0
     let mutable perMonsterCounter = Map.empty
@@ -247,36 +247,36 @@ let toCombatants (db: Map<string, Creature>) teamNumber positioner =
                     for i in 1..quantity do
                         let stats = db[name]
                         let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
-                        Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, positioner (group.center, radius_ group, stats), stats)
+                        yield Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, stats) |> project group
                     counter <- counter + quantity
                     perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
             ]
 
-let makeGroupPositioner ()  = // a groupPositioner is stateful so it can keep track of which spaces are still empty
+let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
     let mutable occupiedCells = Set.empty
-    fun (center: Coords, radius: float<yards>, stats) ->
+    let place (group: GroupSetup) (combatant: Combatant) =
+        let center, radius = group.center, radius_ group
         let gen() =
             let angleRadians = random.NextDouble() * 2. * System.Math.PI
             let radius = random.NextDouble() * radius
             let x = cos angleRadians * radius + fst center |> Ops.round
             let y = sin angleRadians * radius + snd center |> Ops.round
             x, y
-        let rec loop failureCount radius candidate =
+        let rec findEmptyCoords failureCount radius candidate =
             let x,y = candidate
             if occupiedCells.Contains (int x, int y) then
-                if failureCount > 10 then loop 0 (radius + 1.<yards>) (gen()) // maybe it's full; widen the radius so we don't get stuck in an infinite loop
-                else loop (failureCount+1) radius (gen())
+                if failureCount > 10 then findEmptyCoords 0 (radius + 1.<yards>) (gen()) // maybe it's full; widen the radius so we don't get stuck in an infinite loop
+                else findEmptyCoords (failureCount+1) radius (gen())
             else
                 occupiedCells <- occupiedCells.Add (int x, int y)
                 candidate
-        loop 0 radius (gen())
-
-let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
-    let positioner = makeGroupPositioner() // stateful!
-    { combatants =
-        (team1 |> (toCombatants db 1 positioner)) @ (team2 |> (toCombatants db 2 positioner))
-        |> Seq.map(fun c -> c.Id, c)
-        |> Map.ofSeq
+        combatant, findEmptyCoords 0 radius (gen())
+    let setup = (team1 |> (toCombatants db 1 place)) @ (team2 |> (toCombatants db 2 place))
+    let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
+    let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Map.ofList
+    {   combatants = combatants
+        positions = positions
+        behaviors = Map.empty
         }
 let specificFight db team1 team2 = async {
     let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), update)
