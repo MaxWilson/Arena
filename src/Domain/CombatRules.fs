@@ -3,6 +3,68 @@ open Domain
 open Domain.Random
 open Domain.Behavior
 
+module CombatEvents =
+    let update msg model =
+        let updateCombatant id (f: Combatant -> Combatant) model =
+            {   model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
+        let purchaseAttacks (c: Combatant) =
+            if c.attackBudget > 0 then c
+            elif c.maneuverBudget > 0 then { c with maneuverBudget = c.maneuverBudget - 1; attackBudget = c.stats.ExtraAttack_ + 1 }
+            else shouldntHappen() // maybe there's a better way to signal this, but we should also catch this between the behavior action request and this update function, so this shouldn't happen.
+        let consumeManeuver id =
+            updateCombatant id (fun c -> if c.maneuverBudget = 0 then shouldntHappen() else { c with maneuverBudget = c.maneuverBudget - 1 })
+        let consumeAttack id =
+            updateCombatant id (fun c -> let c = purchaseAttacks c in { c with attackBudget = c.attackBudget - 1 })
+        let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
+            updateCombatant id (fun c ->
+                match defense with
+                | Some defense ->
+                    { c with
+                        retreatUsed = c.retreatUsed |> Option.orElse defense.retreatFrom
+                        blockUsed = c.blockUsed || defense.defense = Block
+                        parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
+                        }
+                | None -> c)
+        let newTurn (id: CombatantId) =
+            updateCombatant id Combatant.newTurn
+        let takeDamage (id: CombatantId) amount conditions =
+            updateCombatant id (fun c ->
+                let goingBerserk = conditions |> List.contains Berserk
+                // if going berserk, make sure to remove Stunned from conditions
+                let mods' = (c.statusMods @ conditions) |> List.distinct
+                { c with
+                    injuryTaken = c.injuryTaken + amount
+                    shockPenalty =
+                        if c.stats.SupernaturalDurability || c.stats.HighPainThreshold || (mods' |> List.contains Berserk) then 0
+                        else (c.shockPenalty - (amount / (max 1 (c.stats.HP_ / 10)))) |> max -4
+                    statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
+                    })
+        match msg with
+        | NewTurn id -> model |> newTurn id
+        | Hit (ids, defense, injury, statusImpact, rollDetails) ->
+            model
+            |> consumeAttack ids.attacker
+            |> consumeDefense ids.target defense
+            |> takeDamage ids.target injury statusImpact
+        | SuccessfulDefense(ids, defense, rollDetails) ->
+            model
+                |> consumeAttack ids.attacker
+                |> consumeDefense ids.target (Some defense)
+        | Miss (ids, rollDetails) -> model |> consumeAttack ids.attacker
+        | FallUnconscious(id, rollDetails) ->
+            model |> takeDamage id 0 [Unconscious]
+        | Unstun(id, rollDetails) ->
+            model
+                |> updateCombatant id (fun c ->
+                    { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
+        | StandUp(id, rollDetails) ->
+            model
+                |> consumeManeuver id
+                |> updateCombatant id (fun c ->
+                    { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
+        | Info (id, _, _) -> model
+        | NewRound _ -> model
+
 let successTest target x =
     if x >= target + 10 then CritFail (x - target)
     elif x = 17 then if target >= 16 then Fail(x - 16) else CritFail (x - 16)
@@ -113,6 +175,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                 |> cqrs.Execute
             else
                 for m in 1..(1 + attacker.stats.AlteredTimeRate_) do
+                    printfn "%A attacking" (attacker.personalName)
                     let totalAttacks, rapidStrikes =
                         (if attacker.stats.UseRapidStrike then 2 + attacker.stats.ExtraAttack_, 2 else 1 + attacker.stats.ExtraAttack_, 0)
                     let totalAttacks = if attacker.is Berserk then totalAttacks + 1 else totalAttacks
@@ -279,7 +342,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
         behaviors = Map.empty
         }
 let specificFight db team1 team2 = async {
-    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), update)
+    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatEvents.update)
     let victors = fight cqrs
     return cqrs.LogWithMessages(), victors
     }
@@ -299,7 +362,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
     let runForN n = async {
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
         let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
-        let cqrs = CQRS.CQRS.Create(combat, update)
+        let cqrs = CQRS.CQRS.Create(combat, CombatEvents.update)
         return cqrs, fight cqrs
         }
     let mutable results: Map<_,int*CombatLog> = Map.empty

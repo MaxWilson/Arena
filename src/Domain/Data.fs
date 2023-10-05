@@ -247,8 +247,11 @@ module Data =
         retreatUsed: CombatantId option
         blockUsed: bool
         parriesUsed: int
-        attacksUsed: int
-        rapidStrikeUsed: bool
+        maneuverBudget: int // use maneuvers to get movement and attacks
+        rapidStrikeBudget: int
+        attackBudget: int
+        movementBudget: int
+        stepBudget: int
         }
         with
         member this.CurrentHP_ = this.stats.HP_ - this.injuryTaken
@@ -264,8 +267,11 @@ module Data =
                 retreatUsed = None
                 blockUsed = false
                 parriesUsed = 0
-                attacksUsed = 0
-                rapidStrikeUsed = false
+                maneuverBudget = 1
+                rapidStrikeBudget = 0
+                attackBudget = 0
+                movementBudget = 0
+                stepBudget = 0
                 }
         member this.is (status: Status) = this.statusMods |> List.exists ((=) status)
         member this.isAny (statuses: Status list) = this.statusMods |> List.includes statuses
@@ -277,9 +283,12 @@ module Data =
                 retreatUsed = None
                 blockUsed = false
                 parriesUsed = 0
-                attacksUsed = 0
-                rapidStrikeUsed = false
                 shockPenalty = 0
+                maneuverBudget = 1 + combatant.stats.AlteredTimeRate_
+                rapidStrikeBudget = 0
+                attackBudget = 0
+                movementBudget = 0
+                stepBudget = 0
                 }
 
     type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
@@ -310,56 +319,8 @@ module Data =
             | Unstun of CombatantId * string
             | StandUp of CombatantId * string
             | Info of CombatantId * msg: string * rollInfo: string
+            | NewTurn of CombatantId
             | NewRound of int
-        let update msg model =
-            let updateCombatant id (f: Combatant -> Combatant) model =
-                {   model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
-            let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
-                updateCombatant id (fun c ->
-                    match defense with
-                    | Some defense ->
-                        { c with
-                            retreatUsed = c.retreatUsed |> Option.orElse defense.retreatFrom
-                            blockUsed = c.blockUsed || defense.defense = Block
-                            parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
-                            }
-                    | None -> c)
-            let newTurn (id: CombatantId) =
-                updateCombatant id Combatant.newTurn
-            let takeDamage (id: CombatantId) amount conditions =
-                updateCombatant id (fun c ->
-                    let goingBerserk = conditions |> List.contains Berserk
-                    // if going berserk, make sure to remove Stunned from conditions
-                    let mods' = (c.statusMods @ conditions) |> List.distinct
-                    { c with
-                        injuryTaken = c.injuryTaken + amount
-                        shockPenalty =
-                            if c.stats.SupernaturalDurability || c.stats.HighPainThreshold || (mods' |> List.contains Berserk) then 0
-                            else (c.shockPenalty - (amount / (max 1 (c.stats.HP_ / 10)))) |> max -4
-                        statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
-                        })
-            match msg with
-            | Hit (ids, defense, injury, statusImpact, rollDetails) ->
-                model |> newTurn ids.attacker
-                    |> consumeDefense ids.target defense
-                    |> takeDamage ids.target injury statusImpact
-            | SuccessfulDefense(ids, defense, rollDetails) ->
-                model |> newTurn ids.attacker
-                    |> consumeDefense ids.target (Some defense)
-            | Miss (ids, rollDetails) ->
-                model |> newTurn ids.attacker
-            | FallUnconscious(id, rollDetails) ->
-                model |> newTurn id |> takeDamage id 0 [Unconscious]
-            | Unstun(id, rollDetails) ->
-                model |> newTurn id
-                    |> updateCombatant id (fun c ->
-                            { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
-            | StandUp(id, rollDetails) ->
-                model |> newTurn id
-                    |> updateCombatant id (fun c ->
-                            { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
-            | Info (id, _, _) -> model |> newTurn id
-            | NewRound _ -> model
     type CombatLog = (Event option * Combat) list
 
     type DefeatCriteria =
