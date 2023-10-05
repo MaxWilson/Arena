@@ -292,7 +292,10 @@ module Data =
                 }
 
     type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
-    and ActionBehavior = Coroutine.Behavior<Action, unit, ActionContext, unit>
+    and ActionFeedback = unit
+    and ActionResult = unit
+    and ActionBehavior = Coroutine.Behavior<Action, ActionFeedback, ActionContext, ActionResult>
+    and ActionBehaviorResult = Coroutine.ExecutionResult<Action, ActionFeedback, ActionContext, ActionResult>
     and Combat = {
         combatants: Map<CombatantId, Combatant>
         positions: Map<CombatantId, Coords>

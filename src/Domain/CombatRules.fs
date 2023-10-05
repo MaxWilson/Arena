@@ -131,6 +131,39 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
         loop 0
     else false
 
+module ExecuteAction =
+    let attack (cqrsExecute: _ -> unit) (ctx: ActionContext) (details: AttackDetails) =
+        notImpl "cqrsExecute a bunch of stuff"
+        ()
+    let move = notImpl
+
+let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) ((action, behavior) as input) : (Action * ActionBehavior) option =
+    let continue'() =
+        match (behavior((), getCtx())) with
+        | Coroutine.Finished () -> None
+        | Coroutine.AwaitingAction(Yield, behavior) -> Some(Yield, behavior) // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
+        | Coroutine.AwaitingAction(action, behavior) ->
+            iterateBehavior cqrsExecute getCtx (action, behavior)  // feedback will probably be more than just unit eventually, after we have our log system in place
+    match action with
+    | Attack(details) ->
+        let ctx = getCtx()
+        if ctx.me_.attackBudget = 0 then Some input // change nothing, block until an attack is available
+        else
+            ExecuteAction.attack cqrsExecute ctx details
+            continue'()
+    | Move(pos) ->
+        let ctx = getCtx()
+        // check that we have enough movement points/maneuvers available...
+        let me = ctx.me_
+        if me.maneuverBudget = 0 && me.movementBudget = 0 && me.stepBudget = 0 then Some input // change nothing, block until a maneuver is available
+        else
+            // then cqrsExecute the appropriate commands
+            // cqrsExecute a bunch of stuff and then...
+            ExecuteAction.move cqrsExecute ctx pos
+            continue'()
+    | Yield ->
+        continue'()
+
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
     // HIGH speed and DX goes first so we use the negative of those values
     for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
@@ -197,7 +230,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     if attacker.shockPenalty <> 0 then
                                         recordMsg $"Shock penalty %+d{attacker.shockPenalty}"
                                     match (attacker.stats.WeaponSkill_ + attacker.shockPenalty + rapidStrikePenalty) with
-                                    | n when n >= 18 ->
+                                    | n when  n >= 18 ->
                                         let deceptive = (n - 16)/2
                                         recordMsg $"Using Deceptive Attack {-2 * deceptive}"
                                         n - deceptive * 2, deceptive
