@@ -322,7 +322,6 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                         //<img aria-label="⚔️" src="/assets/e7159ba0fcc85f39f95227dd85f44aeb.svg" alt="⚔️" draggable="false" class="emoji" data-type="emoji" data-name=":crossed_swords:">
                     let hpText hp = classP' "injury" Html.span [prop.text $"{hp} HP"]
                     match msg with
-                    | NewTurn _ -> ()
                     | Hit (ids, _, injury, statusImpact, rollDetails) ->
                         let hit verb =
                             div [bigHit; name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for "; hpText injury; viewDetails rollDetails]

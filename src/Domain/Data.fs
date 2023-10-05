@@ -311,7 +311,7 @@ module Data =
 
     [<AutoOpen>]
     module CombatEvents =
-        type Event =
+        type Logged =
             | Hit of Ids * DefenseDetails option * injury:int * Status list * string
             | SuccessfulDefense of Ids * DefenseDetails * string
             | Miss of Ids * string
@@ -319,9 +319,12 @@ module Data =
             | Unstun of CombatantId * string
             | StandUp of CombatantId * string
             | Info of CombatantId * msg: string * rollInfo: string
-            | NewTurn of CombatantId
             | NewRound of int
-    type CombatLog = (Event option * Combat) list
+        type HouseKeeping =
+            | NewTurn of CombatantId
+        type Event = Logged of Logged | Unlogged of HouseKeeping
+    type CombatFullLog = (Event option * Combat) list
+    type CombatLog = (Logged option * Combat) list
 
     type DefeatCriteria =
         | TPK

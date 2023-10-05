@@ -40,30 +40,32 @@ module CombatEvents =
                     statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
                     })
         match msg with
-        | NewTurn id -> model |> newTurn id
-        | Hit (ids, defense, injury, statusImpact, rollDetails) ->
-            model
-            |> consumeAttack ids.attacker
-            |> consumeDefense ids.target defense
-            |> takeDamage ids.target injury statusImpact
-        | SuccessfulDefense(ids, defense, rollDetails) ->
-            model
+        | Unlogged(NewTurn id) -> model |> newTurn id
+        | Logged msg ->
+            match msg with
+            | Hit (ids, defense, injury, statusImpact, rollDetails) ->
+                model
                 |> consumeAttack ids.attacker
-                |> consumeDefense ids.target (Some defense)
-        | Miss (ids, rollDetails) -> model |> consumeAttack ids.attacker
-        | FallUnconscious(id, rollDetails) ->
-            model |> takeDamage id 0 [Unconscious]
-        | Unstun(id, rollDetails) ->
-            model
-                |> updateCombatant id (fun c ->
-                    { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
-        | StandUp(id, rollDetails) ->
-            model
-                |> consumeManeuver id
-                |> updateCombatant id (fun c ->
-                    { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
-        | Info (id, _, _) -> model
-        | NewRound _ -> model
+                |> consumeDefense ids.target defense
+                |> takeDamage ids.target injury statusImpact
+            | SuccessfulDefense(ids, defense, rollDetails) ->
+                model
+                    |> consumeAttack ids.attacker
+                    |> consumeDefense ids.target (Some defense)
+            | Miss (ids, rollDetails) -> model |> consumeAttack ids.attacker
+            | FallUnconscious(id, rollDetails) ->
+                model |> takeDamage id 0 [Unconscious]
+            | Unstun(id, rollDetails) ->
+                model
+                    |> updateCombatant id (fun c ->
+                        { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
+            | StandUp(id, rollDetails) ->
+                model
+                    |> consumeManeuver id
+                    |> updateCombatant id (fun c ->
+                        { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
+            | Info (id, _, _) -> model
+            | NewRound _ -> model
 
 let successTest target x =
     if x >= target + 10 then CritFail (x - target)
@@ -160,23 +162,24 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
         let mutable doneEarly = false
         let attacker = cqrs.State.combatants[c]
-        NewTurn attacker.Id |> cqrs.Execute
+        let loggedExecute msg = cqrs.Execute (Logged msg)
+        let silentExecute msg = cqrs.Execute (Unlogged msg)
+        NewTurn attacker.Id |> silentExecute
         if attacker.isnt [Dead; Unconscious] then
             if attacker.is Stunned then
                 if attempt "Recover from stun" attacker.stats.HT_ then
                     Unstun(attacker.Id, msg)
                 else
                     Info(attacker.Id, "does nothing", msg)
-                |> cqrs.Execute
+                |> loggedExecute
             elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious (attacker, attacker.is Berserk) 0 then
                 FallUnconscious(attacker.Id, msg)
-                |> cqrs.Execute
+                |> loggedExecute
             elif attacker.is Prone then
                 StandUp(attacker.Id, msg)
-                |> cqrs.Execute
+                |> loggedExecute
             else
                 for m in 1..(1 + attacker.stats.AlteredTimeRate_) do
-                    printfn "%A attacking" (attacker.personalName)
                     let totalAttacks, rapidStrikes =
                         (if attacker.stats.UseRapidStrike then 2 + attacker.stats.ExtraAttack_, 2 else 1 + attacker.stats.ExtraAttack_, 0)
                     let totalAttacks = if attacker.is Berserk then totalAttacks + 1 else totalAttacks
@@ -273,7 +276,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                             | None ->
                                 doneEarly <- true
                                 Info(attacker.Id, "can't find a victim", msg)
-                            |> cqrs.Execute
+                            |> loggedExecute
                             msg <- "" // if multiple attacks process we don't want to redisplay the same text
 
 
@@ -288,7 +291,7 @@ let fight (cqrs: CQRS.CQRS<_,Combat>) =
             {| victors = survivingTeams |}
         else
             if counter > 1 then
-                cqrs.Execute (NewRound(counter))
+                cqrs.Execute (Logged(NewRound(counter)))
             fightOneRound cqrs
             loop (counter + 1)
     loop 1
@@ -342,11 +345,15 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
         positions = positions
         behaviors = Map.empty
         }
+// convert a CombatFullLog to CombatLog, to make display easier by filtering out housekeeping events
+let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), combat -> Some(Some msg, combat) | None, combat -> Some(None, combat))
+
 let specificFight db team1 team2 = async {
     let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatEvents.update)
     let victors = fight cqrs
-    return cqrs.LogWithMessages(), victors
+    return (cqrs.LogWithMessages() |> loggedOnly), victors
     }
+
 module Team =
     let randomInitialPosition members : _ GroupSetup =
         let yards n = float n * 1.<yards>
@@ -366,7 +373,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
         let cqrs = CQRS.CQRS.Create(combat, CombatEvents.update)
         return cqrs, fight cqrs
         }
-    let mutable results: Map<_,int*CombatLog> = Map.empty
+    let mutable results: Map<_,int*CombatFullLog> = Map.empty
     let get n = async {
         if results.ContainsKey n then return results[n]
         else
@@ -376,7 +383,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
                         runForN n
                     ]
                 |> Async.Parallel
-            let sampleLog: CombatLog = (runs |> Array.last |> fst).LogWithMessages()
+            let sampleLog: CombatFullLog = (runs |> Array.last |> fst).LogWithMessages()
             let victoryMetric : CQRS.CQRS<_, Combat> * {| victors: int list |} -> int =
                 match defeatCriteria with
                 | TPK -> function (_, v) when v.victors = [1] -> 1 | otherwise -> 0
@@ -397,7 +404,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
                         else 1
 
             let victories = runs |> Array.sumBy victoryMetric
-            results <- results |> Map.add n (victories, sampleLog)
+            results <- results |> Map.add n (victories, sampleLog |> List.filter (function Some (Unlogged _), _ -> false | _ -> true))
             return results[n]
         }
     // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
@@ -419,5 +426,5 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
     | inbounds ->
         let min, _ = inbounds |> List.minBy fst
         let max, (_, sampleFight) = inbounds |> List.maxBy fst
-        return Some min, Some max, Some sampleFight
+        return Some min, Some max, Some (loggedOnly sampleFight)
     }
