@@ -19,12 +19,13 @@ let informUserOfError msg = UserFacingException msg |> raise
 type React =
     static member inline useElmishSimple (init: _ -> 'model) (update: 'msg -> 'model -> 'model) =
         React.useElmish(fun _ -> Program.mkSimple init update (fun _ _ -> ()))
-    static member inline useStateWithDependencies state dependencies =
+    static member inline useStateWithDependencies (getState: unit -> _) dependencies =
         // we want to reinitialize combat if and only if dependencies change, instead of never reinitializing it.
         let deps, setDeps = React.useState (thunk dependencies)
-        let currentValue, setter = React.useState (thunk state)
+        let currentValue, setter = React.useState getState // for perf reasons we expect state to come in as a function instead of a concrete value
         if(deps <> dependencies) then // will happen when we run a new combat
             setDeps dependencies
+            let state = getState()
             setter state
             state, setter
         else currentValue, setter
