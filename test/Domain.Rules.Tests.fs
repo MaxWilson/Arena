@@ -113,7 +113,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
                 create "Badly Hurt Guy" 13 []
                 create "Dying Guy" 22 [Unconscious]
                 ]
-            |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; positions = Map.empty; behaviors = Map.empty }
+            |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; positions = Map.empty }
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
                     = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Stunned Dying Guy"; "Badly Hurt Guy"; ] @>
@@ -134,6 +134,6 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             | Domain.Parser.Creature (v, Packrat.End) -> v
             | v -> shouldntHappen()
         let db = [parse "Minotaur: ST 23 Berserk Auto"] |> List.map (fun c -> c.name, c) |> Map.ofList
-        let c = createCombat db (Team.fresh [(1, "Minotaur")]) (Team.fresh [(1, "Minotaur")])
+        let c = createCombat db (Team.fresh [(1, "Minotaur")]) (Team.fresh [(1, "Minotaur")]) |> fun c -> c.combat
         verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.is Berserk) @>
     ]

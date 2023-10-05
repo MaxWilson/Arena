@@ -215,7 +215,8 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
 [<ReactComponent>]
 let ViewCombat (setup, combatLog: CombatLog) dispatch =
     let showRolls, setShowRolls = React.useState true
-    let combat, setCombat = React.useState (combatLog |> List.last |> snd)
+    // we want to reinitialize combat if and only if combatLog changes, instead of never reinitializing it. I.e. when we run a new fight we should wipe the old display and start over
+    let combat, setCombat = React.useStateWithDependencies (combatLog |> List.last |> snd) combatLog
     let currentIndex, setCurrentIndex = React.useState 0
     class' "combat" Html.div [
         class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, combat.positions) dispatch]

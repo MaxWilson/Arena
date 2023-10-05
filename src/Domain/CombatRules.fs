@@ -5,8 +5,9 @@ open Domain.Behavior
 
 module CombatEvents =
     let update msg model =
-        let updateCombatant id (f: Combatant -> Combatant) model =
-            {   model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
+        let updateCombat f (model: AugmentedCombat) = { model with AugmentedCombat.combat = f model.combat }
+        let updateCombatant id (f: Combatant -> Combatant) = updateCombat <| fun (model: Combat) ->
+            { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
         let purchaseAttacks (c: Combatant) =
             if c.attackBudget > 0 then c
             elif c.maneuverBudget > 0 then { c with maneuverBudget = c.maneuverBudget - 1; attackBudget = c.stats.ExtraAttack_ + 1 }
@@ -164,9 +165,9 @@ module ExecuteAction =
                     attempt followup
         attempt behavior
 
-let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
+let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
     // HIGH speed and DX goes first so we use the negative of those values
-    for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
+    for c in cqrs.State.combat.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
         let roll3d6 = RollSpec.create(3,6)
         let mutable msg = ""
         let recordMsg txt =
@@ -194,7 +195,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
             attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
         let mutable doneEarly = false
-        let attacker = cqrs.State.combatants[c]
+        let attacker = cqrs.State.combat.combatants[c]
         let loggedExecute msg = cqrs.Execute (Logged msg)
         let silentExecute msg = cqrs.Execute (Unlogged msg)
         NewTurn attacker.Id |> silentExecute
@@ -210,7 +211,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                 |> loggedExecute
             elif cqrs.State.behaviors.ContainsKey attacker.Id then
                 let behavior = cqrs.State.behaviors[attacker.Id]
-                let getCtx() = { combat = cqrs.State; me = attacker.Id }
+                let getCtx() = { combat = cqrs.State.combat; me = attacker.Id }
                 SetBehavior(attacker.Id, ExecuteAction.iterateBehavior loggedExecute getCtx behavior) |> silentExecute
             // this other stuff needs to get refactored into the behavior system
             elif attacker.is Prone then
@@ -223,7 +224,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                     let totalAttacks = if attacker.is Berserk then totalAttacks + 1 else totalAttacks
                     for n in 1..totalAttacks do
                         if (not doneEarly) then
-                            match attacker |> tryFindTarget cqrs.State with
+                            match attacker |> tryFindTarget cqrs.State.combat with
                             | Some victim ->
                                 let skill, defensePenalty =
                                     let rapidStrikePenalty =
@@ -318,10 +319,10 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                             msg <- "" // if multiple attacks process we don't want to redisplay the same text
 
 
-let fight (cqrs: CQRS.CQRS<_,Combat>) =
+let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) =
     let rec loop counter =
         let survivingTeams =
-            let everyone = cqrs.State.combatants.Values |> List.ofSeq
+            let everyone = cqrs.State.combat.combatants.Values |> List.ofSeq
             everyone |> List.choose (fun c -> if c.isnt [Dead; Unconscious] then Some c.team else None)
                      |> List.distinct
         if survivingTeams.Length < 2 || counter > 100 then
@@ -379,12 +380,15 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
     let setup = (team1 |> (toCombatants db 1 place)) @ (team2 |> (toCombatants db 2 place))
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
     let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Map.ofList
-    {   combatants = combatants
-        positions = positions
-        behaviors = Map.empty
+    let behaviors = setup |> List.map (fun (c, _) -> c.Id, justAttack) |> Map.ofList
+    {   combat =
+            {   combatants = combatants
+                positions = positions
+            }
+        behaviors = behaviors
         }
 // convert a CombatFullLog to CombatLog, to make display easier by filtering out housekeeping events
-let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), combat -> Some(Some msg, combat) | None, combat -> Some(None, combat))
+let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), aug -> Some(Some msg, aug.combat) | None, aug -> Some(None, aug.combat))
 
 let specificFight db team1 team2 = async {
     let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatEvents.update)
@@ -411,7 +415,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
         let cqrs = CQRS.CQRS.Create(combat, CombatEvents.update)
         return cqrs, fight cqrs
         }
-    let mutable results: Map<_,int*CombatFullLog> = Map.empty
+    let mutable results: Map<_,int*AugmentedCombatLog> = Map.empty
     let get n = async {
         if results.ContainsKey n then return results[n]
         else
@@ -421,21 +425,21 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
                         runForN n
                     ]
                 |> Async.Parallel
-            let sampleLog: CombatFullLog = (runs |> Array.last |> fst).LogWithMessages()
-            let victoryMetric : CQRS.CQRS<_, Combat> * {| victors: int list |} -> int =
+            let sampleLog: AugmentedCombatLog = (runs |> Array.last |> fst).LogWithMessages()
+            let victoryMetric : CQRS.CQRS<_, AugmentedCombat> * {| victors: int list |} -> int =
                 match defeatCriteria with
                 | TPK -> function (_, v) when v.victors = [1] -> 1 | otherwise -> 0
                 | OneCasualty ->
                     fun (cqrs, v) ->
                         // in this case, TeamA is very casualty-averse. Defeat is taking even one casualty (dead or unconscious).
-                        if cqrs.State.combatants.Values |> Seq.exists (fun c ->
+                        if cqrs.State.combat.combatants.Values |> Seq.exists (fun c ->
                             c.team = 1 && c.isAny[Dead; Unconscious]) then
                             0
                         else 1
                 | HalfCasualties ->
                     fun (cqrs, v) ->
                         // in this case, TeamA is somewhat casualty-averse. Defeat is a pyrrhic victory where at least half the team dies.
-                        let friendlies = cqrs.State.combatants.Values |> Seq.filter (fun c -> c.team = 1)
+                        let friendlies = cqrs.State.combat.combatants.Values |> Seq.filter (fun c -> c.team = 1)
                         let deadFriendlies = friendlies |> Seq.filter (fun c -> c.isAny[Dead; Unconscious])
                         if deadFriendlies |> Seq.length >= ((friendlies |> Seq.length) / 2) then
                             0

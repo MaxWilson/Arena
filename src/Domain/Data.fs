@@ -291,16 +291,17 @@ module Data =
                 stepBudget = 0
                 }
 
-    type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
-    and ActionFeedback = unit
-    and ActionResult = unit
-    and ActionBehavior = Coroutine.Behavior<Action, ActionFeedback, ActionContext, ActionResult>
-    and ActionBehaviorResult = Coroutine.ExecutionResult<Action, ActionFeedback, ActionContext, ActionResult>
-    and Combat = {
+    type Combat = {
         combatants: Map<CombatantId, Combatant>
         positions: Map<CombatantId, Coords>
-        behaviors: Map<CombatantId, ActionBehavior>
         }
+    type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
+    type ActionFeedback = unit
+    type ActionResult = unit
+    type ActionBehavior = Coroutine.Behavior<Action, ActionFeedback, ActionContext, ActionResult>
+    type ActionBehaviorResult = Coroutine.ExecutionResult<Action, ActionFeedback, ActionContext, ActionResult>
+    type Behaviors = Map<CombatantId, ActionBehavior>
+    type AugmentedCombat = { combat: Combat; behaviors: Behaviors }
     type Ids =
         { attacker: CombatantId; target: CombatantId }
         with
@@ -327,7 +328,7 @@ module Data =
             | NewTurn of CombatantId
             | SetBehavior of CombatantId * ActionBehavior option
         type Event = Logged of Logged | Unlogged of HouseKeeping
-    type CombatFullLog = (Event option * Combat) list
+    type AugmentedCombatLog = (Event option * AugmentedCombat) list
     type CombatLog = (Logged option * Combat) list
 
     type DefeatCriteria =
