@@ -263,8 +263,8 @@ module ExecuteAction =
             | AwaitingAction(Attack({ rapidStrike = true } as details), followup), ConsumeRapidStrike me -> // rapid strikes cost less than regular attacks
                 doAttack msg cqrsExecute ctx details
                 attempt "" followup
-            | AwaitingAction(Attack(details), followup), ConsumeAttack me -> // NOT a rapid strike consumption
-                doAttack msg cqrsExecute ctx details
+            | AwaitingAction(Attack(details), followup), ConsumeAttack me -> // NOT a rapid strike because we can't afford one
+                doAttack msg cqrsExecute ctx { details with rapidStrike = false }
                 attempt "" followup
             | AwaitingAction(Move(pos), followup), AvailableMove me ->
                 let me = ctx.me_

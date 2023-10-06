@@ -225,7 +225,7 @@ module Data =
         // multiple Rapid Strikes. It's up to the GMing logic to verify rules compliance as part of
         // action resolution.
         target: CombatantId
-        rapidStrike: bool
+        rapidStrike: bool // whether to attempt a rapid strike. Note that the action logic can choose to ignore this flag if no rapid strikes are available--because that's better than allowing a faulty or malicious behavior to crash the system, and more convenient for the faulty behavior than causing it to force a yield.
         location: HitLocation option
         deceptiveLevels: int
         }
