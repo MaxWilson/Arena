@@ -143,4 +143,12 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ after.rapidStrikeBudget = Some 1 @>
         verify <@ after.attackBudget = 1 @>
         verify <@ after.maneuverBudget = 0 @>
+        let after = match after with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
+        verify <@ after.rapidStrikeBudget = Some 0 @>
+        verify <@ after.attackBudget = 1 @>
+        verify <@ after.maneuverBudget = 0 @>
+        let after = match after with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
+        verify <@ after.rapidStrikeBudget = Some 0 @>
+        verify <@ after.attackBudget = 0 @>
+        verify <@ after.maneuverBudget = 0 @>
     ]
