@@ -360,7 +360,6 @@ module Data =
         }
         with static member fresh setPosition = { sideA = []; sideB = Opposition.calibrated (None, None, None, TPK) setPosition }
 
-
 #nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing
 module Parser =
     open Packrat
