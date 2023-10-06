@@ -254,9 +254,12 @@ module ExecuteAction =
         let startPos = ctx.geo.Find(ctx.me)
         let goalPos = match dest with Place p -> p | Person p -> ctx.geo.Find p
         let dist = ctx.geo.DistanceBetween(startPos, goalPos)
-        //if dist > ctx.me_.movementBudget
-        notImpl "Movement/doMove"
-
+        match ctx.me_ with
+        | AvailableMove(move, me) ->
+            if (float move * 1.<yards>) <= dist then
+                notImpl "Move directly to goalPos"
+            else notImpl "Move partway there"
+        | _ -> shouldntHappen "We should have already checked move"
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
         let rec attempt msg (behavior as unchanged) =
