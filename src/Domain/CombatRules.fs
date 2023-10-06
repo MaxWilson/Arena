@@ -11,7 +11,7 @@ module Resourcing =
     let (|ConsumeAttack|_|) (c:Combatant) =
         match c with
         | c when c.attackBudget > 0 -> Some ({ c with attackBudget = c.attackBudget - 1}) // no change to other fields needed
-        | ConsumeManeuver c -> Some({ c with attackBudget = c.attackBudget + (1+c.stats.ExtraAttack_) })
+        | ConsumeManeuver c -> Some({ c with attackBudget = c.attackBudget + c.stats.ExtraAttack_ }) // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
         | _ -> None
     let (|AvailableMove|_|) (c:Combatant) =
         match c with
@@ -35,7 +35,8 @@ module CombatEvents =
         let updateCombat f (model: AugmentedCombat) = { model with AugmentedCombat.combat = f model.combat }
         let updateCombatant id (f: Combatant -> Combatant) = updateCombat <| fun (model: Combat) ->
             { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
-        let updateCombatantWith (|Pattern|_|) id = updateCombatant id (function Pattern c -> c | _ -> shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase.")
+        let updateCombatantWith (|Pattern|_|) id =
+            updateCombatant id (function Pattern c -> c | _ -> shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase.")
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatantWith ((|ConsumeDefense|_|) defense) id
         let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
