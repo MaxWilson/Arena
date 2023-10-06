@@ -219,7 +219,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
     let combat, setCombat = React.useStateWithDependencies (fun () -> combatLog |> List.last |> snd) combatLog
     let currentIndex, setCurrentIndex = React.useState 0
     class' "combat" Html.div [
-        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, combat.positions) dispatch]
+        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, combat.geo) dispatch]
         class' "statusTable" Html.div [
             Html.table [
                 Html.thead [

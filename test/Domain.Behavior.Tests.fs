@@ -13,11 +13,17 @@ let verify = Swensen.Unquote.Assertions.test
 let Tests = testLabel "Unit" <| testList "Behavior" [
     testCase "Cowardly should flee when damaged" <| fun () ->
         let rec fakeFlee: ActionBehavior = behavior {
-            let! (feedback: unit), (ctx: ActionContext) = ReturnAction(Move(Place(10000,0)))
+            let! (feedback: unit), (ctx: ActionContext) = ReturnAction(Move(Place(10000.<yards>,0.<yards>)))
             return! fakeFlee
             }
-        // we don't care who's in the combat as long as there's someone on both sides
-        let combat = createCombat (["Bob", Creature.create "Bob"] |> Map.ofList) (Team.fresh [1, "Bob"]) (Team.fresh [1, "Bob"]) |> fun c -> c.combat
+        let teamOf m coords =
+            [{  members = m
+                center = coords
+                radius = Some 0.<yards>
+                }]
+        // we don't care who's in the combat as long as there's someone on both sides and they're in range of each other
+        let combat = createCombat (["Bob", Creature.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] (0.<yards>, 1.<yards>)) |> fun c -> c.combat
+
         let bob = combat.combatants.Keys |> Seq.head
         let toCtx combat = { me = bob; combat = combat }
 
@@ -39,7 +45,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
                 )
             }
         // wounding Bob forces him to flee until healed
-        doCheckActionFor (Move(Place(10000,0))) woundedBob
+        doCheckActionFor (Move(Place(10000.<yards>,0.<yards>))) woundedBob
         // but when he's healed, he should resume attacking
         doCheckActionFor (Attack(AttackDetails.create(2, "Bob"))) combat // each time we get a new behavior, which should be an attack
     ]

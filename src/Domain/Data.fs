@@ -218,7 +218,8 @@ module Data =
     type CombatantId = int * string
     type HitSide = Left | Right
     type HitLocation = Head | Torso | Arm of HitSide | Leg of HitSide | Hand of HitSide | Foot of HitSide | Vitals | Neck | Groin | Eye of HitSide | Skull
-    type Destination = Person of CombatantId | Place of int * int
+    type Coords = float<yards> * float<yards>
+    type Destination = Person of CombatantId | Place of Coords
     type AttackDetails = {
         // The difference between AttackDetails vs. Combatant is that AttackDetails is an "untrusted"
         // request from the user--the user can request illegal levels of deceptive for example, or
@@ -234,7 +235,6 @@ module Data =
         | Attack of AttackDetails
         | Move of Destination
         | Yield // end turn, wait for things to change
-    type Coords = float<yards> * float<yards>
     type Distance = float<yards>
     type Combatant = {
         personalName: string
@@ -296,9 +296,11 @@ module Data =
         }
     type Combat = {
         combatants: Map<CombatantId, Combatant>
-        positions: Geo2d
+        geo: Geo2d
         }
-    type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
+    type ActionContext = { me: CombatantId; combat: Combat; } with
+        member this.me_ = this.combat.combatants.[this.me]
+        member this.geo = this.combat.geo
     type ActionFeedback = unit
     type ActionResult = unit
     type ActionBehavior = Coroutine.Behavior<Action, ActionFeedback, ActionContext, ActionResult>

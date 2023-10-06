@@ -2,6 +2,7 @@ module Domain.CombatRules
 open Domain
 open Domain.Random
 open Domain.Behavior
+open Domain.Geo
 
 module CombatEvents =
     open Resourcing
@@ -249,9 +250,10 @@ module ExecuteAction =
             Miss({ attacker = attacker.Id; target = victim.Id }, details.rapidStrike, msg)
             |> loggedExecute
 
-    let doMove msg cqrsExecute (ctx: ActionContext) pos =
-        let me = ctx.me_
-        ()
+    let doMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
+        let startPos = ctx.geo.Find(ctx.me)
+        let endPos = match dest with Place p -> p | Person p -> ctx.geo.Find p
+        notImpl "Movement/doMove"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
@@ -266,9 +268,9 @@ module ExecuteAction =
             | AwaitingAction(Attack(details), followup), ConsumeAttack me -> // NOT a rapid strike because we can't afford one
                 doAttack msg cqrsExecute ctx { details with rapidStrike = false }
                 attempt "" followup
-            | AwaitingAction(Move(pos), followup), AvailableMove me ->
+            | AwaitingAction(Move(dest), followup), AvailableMove me ->
                 let me = ctx.me_
-                doMove msg cqrsExecute ctx pos
+                doMove msg cqrsExecute ctx dest
                 attempt "" followup
             | AwaitingAction(action, _), _ -> Some unchanged // We can't afford this action now. Treat it as if it were a Yield: rerun the original behavior next turn and see if the same action is requested/affordable.
         attempt msg behavior
@@ -390,7 +392,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
     let behaviors = setup |> List.map (fun (c, _) -> c.Id, justAttack) |> Map.ofList
     {   combat =
             {   combatants = combatants
-                positions = positions
+                geo = positions
             }
         behaviors = behaviors
         }
