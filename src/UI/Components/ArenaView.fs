@@ -6,6 +6,7 @@ open Feliz
 open Feliz.UseElmish
 open Elmish
 open Domain.Data
+open Domain.Geo
 open UI.Components.Arena
 
 [<AutoOpen>]
@@ -91,182 +92,173 @@ module private Impl =
                     ]
             ]
 
-module private Setup =
-    open type Stage
-    open type Layer
-    open type Circle
-
-    [<ReactComponent>]
-    let View (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
-        display (320, 320) (thunk []) <| fun r -> [
-            layoutGrid r
-            Layer.createNamed "teams" [
-                let groups = [
-                    let specifics isTeamA (side: GroupSetup list) = [
-                        for ix, group in side |> List.mapi Tuple2.create do
-                            for n, monsterName in group.members do
-                                let c = db.catalog[monsterName]
-                                (isTeamA, ix), c.Quantify n, group.center, Domain.CombatRules.radius_ group
-                        ]
-                    yield! (setup.sideA |> specifics true)
-                    match setup.sideB with
-                    | Specific sideB -> yield! specifics false sideB
-                    | Calibrate ({ members = (Some name, _, _, _) } as group) ->
-                        let c = db.catalog[name]
-                        (false, 0), $"N {c.PluralName_}", group.center, 5.<yards>
-                    | Calibrate _ -> ()
+[<ReactComponent>]
+let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
+    display (320, 320) (thunk []) <| fun r -> [
+        layoutGrid r
+        Layer.createNamed "teams" [
+            let groups = [
+                let specifics isTeamA (side: GroupSetup list) = [
+                    for ix, group in side |> List.mapi Tuple2.create do
+                        for n, monsterName in group.members do
+                            let c = db.catalog[monsterName]
+                            (isTeamA, ix), c.Quantify n, group.center, Domain.CombatRules.radius_ group
                     ]
-                for ((isTeamA, _) as groupAddress: bool * int, label, center, radius) in groups do
-                    r.group $"Group{groupAddress}" center [
-                        Group.draggable
-                        Group.onDragEnd(fun e -> onDrag(groupAddress, (r.unscaleX (e.target.x()), r.unscaleY (e.target.y()))))
-                        // Group.offsetX -25
-                        // Group.offsetY -25
-                        Group.children [|
+                yield! (setup.sideA |> specifics true)
+                match setup.sideB with
+                | Specific sideB -> yield! specifics false sideB
+                | Calibrate ({ members = (Some name, _, _, _) } as group) ->
+                    let c = db.catalog[name]
+                    (false, 0), $"N {c.PluralName_}", group.center, 5.<yards>
+                | Calibrate _ -> ()
+                ]
+            for ((isTeamA, _) as groupAddress: bool * int, label, center, radius) in groups do
+                r.group $"Group{groupAddress}" center [
+                    Group.draggable
+                    Group.onDragEnd(fun e -> onDrag(groupAddress, (r.unscaleX (e.target.x()), r.unscaleY (e.target.y()))))
+                    // Group.offsetX -25
+                    // Group.offsetY -25
+                    Group.children [|
+                        circle [
+                            Circle.radius (r.scaleX radius)
+                            Circle.fill (if isTeamA then Color.Blue else Color.Purple)
+                            Circle.key "outline"
+                            ]
+                        text [
+                            Text.verticalAlign Middle
+                            Text.align Center
+                            Text.fill Color.Black
+                            // do NOT scale text to yards
+                            let textWidth = label.Length * 6
+                            Text.width textWidth
+                            Text.offsetX (textWidth / 2 |> float)
+                            Text.height 20
+                            Text.offsetY (let r = r.scaleX radius in if float textWidth < r * 2.5 then 10. else 15. + r) // if the circle is big enough, e.g. "N Orcs", center inside it. But if the label is bigger than the circle, offset it above.
+                            Text.fontSize 9
+                            Text.fontStyle "800" // unusually bold
+                            Text.key "name1"
+                            Text.text label
+                            ]
+                        |]
+
+                    ]
+            ]
+        ]
+
+
+[<ReactComponent>]
+let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
+    let shownNames, setShownNames = React.useState Map.empty
+    let hover, setHover = React.useState None
+    let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
+    let stageRef = React.useRef None
+    let stageProps (r: RenderHelper) = [
+        Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r) :> IStageProperty
+        let inline nearest (x, y) =
+            let x, y = r.unscaleX x |> Ops.round, r.unscaleY y |> Ops.round
+            match nearestNeighborCache |> Map.tryFind (x, y) with
+            | Some ids -> ids
+            | None ->
+                let distancesSquared =
+                    combatants
+                    |> List.map (fun c -> let cx, cy = geo.Find(c.Id) in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
+                    |> List.sortBy snd
+                match distancesSquared with
+                | [] -> []
+                | (closestId, distanceSquared)::rest ->
+                    // include anything that's reasonable close to the nearest thing if the pointer is also close to it
+                    let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
+                    setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
+                    ids
+        let showClosestMonster _ =
+            match stageRef.current with
+            | None -> ()
+            | Some ref ->
+                let x, y = let c = ref.getPointerPosition() in c.x, c.y
+                match nearest (x,y) with
+                | [] as v when hover <> None -> setHover None
+                | h::_ when hover <> Some h -> setHover (Some h)
+                | _ -> ()
+        Stage.onMouseMove showClosestMonster
+        Stage.onTouchStart showClosestMonster
+        Stage.onTouchMove showClosestMonster
+        ]
+    display (320, 320) stageProps <| fun r -> [
+        Layer.createNamed "Background" [
+            Rect.create [
+                Rect.x 0
+                Rect.y 0
+                Rect.fill Color.LightGrey
+                Rect.width winW
+                Rect.height winH
+                Rect.key "Rect1"
+                ]
+            ]
+        layoutGrid r
+        Layer.create [
+            Layer.key "Combatants" :> ILayerProperty
+            Layer.children [
+                // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
+                for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
+                    Group.create ([
+                        let x,y = geo.Find(c.Id)
+                        Group.x (r.scaleX x)
+                        Group.y (r.scaleY y)
+                        Group.key (toString c.Id)
+                        Group.onClick (fun e -> shownNames |> Map.change c.Id (function Some () -> None | None -> Some ()) |> setShownNames)
+                        Group.children [
                             circle [
-                                Circle.radius (r.scaleX radius)
-                                Circle.fill (if isTeamA then Color.Blue else Color.Purple)
+                                Circle.radius (r.scaleX 0.5<yards>)
+                                Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
                                 Circle.key "outline"
+                                // Circle.onMouseOver (fun e ->
+                                //     e.target.getStage().container().style.cursor <- CursorType.Pointer
+                                //     setHover (Some c.Id))
+                                // Circle.onMouseLeave (fun e ->
+                                //     if hover = (Some c.Id) then
+                                //         e.target.getStage().container().style.cursor <- CursorType.Default
+                                //         setHover None
+                                //     )
+                                if hover = Some c.Id then
+                                    Circle.stroke Color.Black
+                                    Circle.strokeWidth 2
+                                elif shownNames |> Map.containsKey c.Id then
+                                    Circle.stroke Color.Black
+                                    Circle.strokeWidth 1
                                 ]
-                            text [
-                                Text.verticalAlign Middle
-                                Text.align Center
-                                Text.fill Color.Black
-                                // do NOT scale text to yards
-                                let textWidth = label.Length * 6
-                                Text.width textWidth
-                                Text.offsetX (textWidth / 2 |> float)
-                                Text.height 20
-                                Text.offsetY (let r = r.scaleX radius in if float textWidth < r * 2.5 then 10. else 15. + r) // if the circle is big enough, e.g. "N Orcs", center inside it. But if the label is bigger than the circle, offset it above.
-                                Text.fontSize 9
-                                Text.fontStyle "800" // unusually bold
-                                Text.key "name1"
-                                Text.text label
-                                ]
-                            |]
-
-                        ]
-                ]
-            ]
-
-let Setup = Setup.View
-module Actual =
-
-    [<ReactComponent>]
-    let View (combatants: Combatant list, positions: Map<CombatantId, Coords>) dispatch =
-        let shownNames, setShownNames = React.useState Map.empty
-        let hover, setHover = React.useState None
-        let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
-        let stageRef = React.useRef None
-        let stageProps (r: RenderHelper) = [
-            Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r) :> IStageProperty
-            let inline nearest (x, y) =
-                let x, y = r.unscaleX x |> Ops.round, r.unscaleY y |> Ops.round
-                match nearestNeighborCache |> Map.tryFind (x, y) with
-                | Some ids -> ids
-                | None ->
-                    let distancesSquared =
-                        combatants
-                        |> List.map (fun c -> let cx, cy = positions[c.Id] in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
-                        |> List.sortBy snd
-                    match distancesSquared with
-                    | [] -> []
-                    | (closestId, distanceSquared)::rest ->
-                        // include anything that's reasonable close to the nearest thing if the pointer is also close to it
-                        let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
-                        setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
-                        ids
-            let showClosestMonster _ =
-                match stageRef.current with
-                | None -> ()
-                | Some ref ->
-                    let x, y = let c = ref.getPointerPosition() in c.x, c.y
-                    match nearest (x,y) with
-                    | [] as v when hover <> None -> setHover None
-                    | h::_ when hover <> Some h -> setHover (Some h)
-                    | _ -> ()
-            Stage.onMouseMove showClosestMonster
-            Stage.onTouchStart showClosestMonster
-            Stage.onTouchMove showClosestMonster
-            ]
-        display (320, 320) stageProps <| fun r -> [
-            Layer.createNamed "Background" [
-                Rect.create [
-                    Rect.x 0
-                    Rect.y 0
-                    Rect.fill Color.LightGrey
-                    Rect.width winW
-                    Rect.height winH
-                    Rect.key "Rect1"
-                    ]
-                ]
-            layoutGrid r
-            Layer.create [
-                Layer.key "Combatants" :> ILayerProperty
-                Layer.children [
-                    // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
-                    for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
-                        Group.create ([
-                            let x,y = positions[c.Id]
-                            Group.x (r.scaleX x)
-                            Group.y (r.scaleY y)
-                            Group.key (toString c.Id)
-                            Group.onClick (fun e -> shownNames |> Map.change c.Id (function Some () -> None | None -> Some ()) |> setShownNames)
-                            Group.children [
-                                circle [
-                                    Circle.radius (r.scaleX 0.5<yards>)
-                                    Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
-                                    Circle.key "outline"
-                                    // Circle.onMouseOver (fun e ->
-                                    //     e.target.getStage().container().style.cursor <- CursorType.Pointer
-                                    //     setHover (Some c.Id))
-                                    // Circle.onMouseLeave (fun e ->
-                                    //     if hover = (Some c.Id) then
-                                    //         e.target.getStage().container().style.cursor <- CursorType.Default
-                                    //         setHover None
-                                    //     )
-                                    if hover = Some c.Id then
-                                        Circle.stroke Color.Black
-                                        Circle.strokeWidth 2
-                                    elif shownNames |> Map.containsKey c.Id then
-                                        Circle.stroke Color.Black
-                                        Circle.strokeWidth 1
+                            if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
+                                let label = c.personalName
+                                let textWidth = label.Length * 14
+                                Rect.create [
+                                    Rect.key "hoverBackground"
+                                    Rect.width textWidth
+                                    Rect.offsetX (textWidth / 2 |> float)
+                                    Rect.height 20
+                                    Rect.offsetY 22.
+                                    Rect.fill Color.White
+                                    Rect.stroke Color.Black
+                                    Rect.strokeWidth 2
                                     ]
-                                if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
-                                    let label = c.personalName
-                                    let textWidth = label.Length * 14
-                                    Rect.create [
-                                        Rect.key "hoverBackground"
-                                        Rect.width textWidth
-                                        Rect.offsetX (textWidth / 2 |> float)
-                                        Rect.height 20
-                                        Rect.offsetY 22.
-                                        Rect.fill Color.White
-                                        Rect.stroke Color.Black
-                                        Rect.strokeWidth 2
-                                        ]
-                                    Text.create [
-                                        Text.verticalAlign Middle
-                                        Text.align Center
-                                        Text.fill Color.Black
-                                        // do NOT scale text to yards
-                                        Text.width textWidth
-                                        Text.offsetX (textWidth / 2 |> float)
-                                        Text.height 20
-                                        Text.offsetY 20.
-                                        Text.fontSize 18
-                                        if hover = Some c.Id then Text.fontStyle "900" // unusually bold
-                                        else Text.fontStyle "bold"
-                                        Text.key "name"
-                                        Text.text label
-                                        ]
-                                ]
-                            ]: IGroupProperty list)
-                    ]
+                                Text.create [
+                                    Text.verticalAlign Middle
+                                    Text.align Center
+                                    Text.fill Color.Black
+                                    // do NOT scale text to yards
+                                    Text.width textWidth
+                                    Text.offsetX (textWidth / 2 |> float)
+                                    Text.height 20
+                                    Text.offsetY 20.
+                                    Text.fontSize 18
+                                    if hover = Some c.Id then Text.fontStyle "900" // unusually bold
+                                    else Text.fontStyle "bold"
+                                    Text.key "name"
+                                    Text.text label
+                                    ]
+                            ]
+                        ]: IGroupProperty list)
                 ]
             ]
-
-let Actual = Actual.View
+        ]
 
 module private Impl0 =
     open Fable.Core.JsInterop

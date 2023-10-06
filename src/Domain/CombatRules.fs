@@ -379,7 +379,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
         combatant, findEmptyCoords 0 radius (gen())
     let setup = (team1 |> (toCombatants db 1 place)) @ (team2 |> (toCombatants db 2 place))
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
-    let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Map.ofList
+    let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Geo.ofList
     let behaviors = setup |> List.map (fun (c, _) -> c.Id, justAttack) |> Map.ofList
     {   combat =
             {   combatants = combatants

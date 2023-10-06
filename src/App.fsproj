@@ -13,6 +13,7 @@
     <Compile Include="Core\Packrat.fs" />
     <Compile Include="Domain\Random.fs" />
     <Compile Include="Domain\Data.fs" />
+    <Compile Include="Domain\Geo2d.fs" />
     <Compile Include="Domain\Behavior.fs" />
     <Compile Include="Domain\CombatRules.fs" />
     <Compile Include="UI\Components\Sample.fs" />

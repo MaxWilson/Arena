@@ -291,9 +291,12 @@ module Data =
                 stepBudget = 0
                 }
 
+    type Geo2d = {
+        lookup: Map<CombatantId, Coords>
+        }
     type Combat = {
         combatants: Map<CombatantId, Combatant>
-        positions: Map<CombatantId, Coords>
+        positions: Geo2d
         }
     type ActionContext = { me: CombatantId; combat: Combat; } with member this.me_ = this.combat.combatants.[this.me]
     type ActionFeedback = unit
