@@ -136,6 +136,31 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
 
 module ExecuteAction =
     open Coroutine
+    let roll3d6 =
+        let dice = RollSpec.create(3,6)
+        dice.roll
+    let detailedAttempt recordMsg label targetNumber =
+        let roll = roll3d6()
+        match successTest targetNumber roll with
+        | CritSuccess _ as success ->
+            recordMsg $"{label} critically succeeded (target {targetNumber}, rolled {roll})"
+            success
+        | Success _ as success ->
+            recordMsg $"{label} succeeded (target {targetNumber}, rolled {roll})"
+            success
+        | Fail _ as fail ->
+            recordMsg $"{label} failed (target {targetNumber}, rolled {roll})"
+            fail
+        | CritFail _ as fail ->
+            recordMsg $"{label} failed (target {targetNumber}, rolled {roll})"
+            fail
+    let attempt recordMsg label targetNumber =
+        match detailedAttempt recordMsg label targetNumber with
+        | (CritSuccess _ | Success _) as success -> true
+        | (CritFail _ | Fail _) -> false
+    let checkGoesUnconscious attempt (self: Combatant, isBerserk) incomingDamage =
+        let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
+        attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
     let doAttack msg (cqrsExecute: CombatEvents.Event -> unit) (ctx: ActionContext) (details: AttackDetails) : unit =
         let mutable msg = msg
         let recordMsg txt =
@@ -144,11 +169,9 @@ module ExecuteAction =
         let combat = ctx.combat
         let loggedExecute = Logged >> cqrsExecute
         let isRapidStrike = details.rapidStrike
-        let attempt = notImpl()
-        let detailedAttempt = notImpl()
-        let checkGoesUnconscious = notImpl()
-        let roll3d6 = notImpl()
-        let msg = notImpl()
+        let attempt = attempt recordMsg
+        let detailedAttempt = detailedAttempt recordMsg
+        let checkGoesUnconscious = checkGoesUnconscious attempt
         let victim = combat.combatants[details.target]
         let skill, defensePenalty =
             let rapidStrikePenalty =
