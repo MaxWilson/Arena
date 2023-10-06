@@ -18,3 +18,4 @@ type Geo2d with
     member this.Find id = this.lookup[id]
     member this.DistanceBetween(lhsId, rhsId) =
         dist (this.Find lhsId) (this.Find rhsId)
+    member this.DistanceBetween(lhsPos, rhsPos) = dist lhsPos rhsPos

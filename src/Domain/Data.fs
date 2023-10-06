@@ -69,6 +69,7 @@ module Data =
         ExtraAttack: int prop
         ExtraParry: int prop
         Speed: float prop
+        Move: int prop
         WeaponMaster: bool
         WeaponSkill: int prop
         Damage: DamageSpec prop
@@ -94,6 +95,7 @@ module Data =
               HT = None
               HP = None
               Speed = None
+              Move = None
               WeaponMaster = false
               WeaponSkill = None
               Damage = None
@@ -124,7 +126,8 @@ module Data =
         member this.IQ_ = defaultArg this.IQ 10
         member this.HT_ = defaultArg this.HT 10
         member this.HP_ = defaultArg this.HP this.ST_
-        member this.Speed_ = defaultArg this.Speed ((this.DX_ + this.HT_ |> float) / 4.)
+        member this.Speed_ = this.Speed |> Option.defaultWith(fun () -> ((this.DX_ + this.HT_ |> float) / 4.))
+        member this.Move_ = defaultArg this.Move (int this.Speed_)
         member this.DR_ = defaultArg this.DR 0
         member this.Dodge_ = defaultArg this.Dodge ((this.Speed_ |> int) + 3)
         // notice: Parry and Block do not exist by default
@@ -168,6 +171,7 @@ module Data =
                 labeled "HT" this.HT
                 labeled "HP" this.HP
                 labeled "Speed" this.Speed
+                labeled "Move" this.Move
                 labeled "Dodge" this.Dodge
                 match this.Parry with
                     | Some p when this.FencingParry -> $"Parry {p}F"
@@ -381,7 +385,7 @@ module Resourcing =
     let (|AvailableMove|_|) (c:Combatant) =
         match c with
         | c when c.movementBudget > 0 -> Some (c.movementBudget, c)
-        | ConsumeManeuver c -> Some(c.movementBudget + 6, c) // TODO: get movement rate from stats instead of hardcoding 6
+        | ConsumeManeuver c -> Some(c.movementBudget + c.stats.Move_, c)
         | _ -> None
     let (|ConsumeDefense|_|) (defense: DefenseDetails option) (c: Combatant) =
         match c.retreatFrom, defense with
@@ -450,6 +454,7 @@ module Parser =
         | OWSStr "HP" (Int (v, rest)) -> Some((fun c -> { c with HP = Some v }), rest)
         | OWSStr "DR" (Int (v, rest)) -> Some((fun c -> { c with DR = Some v }), rest)
         | OWSStr "Speed" (Decimal (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
+        | OWSStr "Move" (Int (v, rest)) -> Some((fun c -> { c with Move = Some v }), rest)
         | OWSStr "Dodge" (Int (v, rest)) -> Some((fun c -> { c with Dodge = Some v }), rest)
         | OWSStr "Parry" (Int (v, Str "F" rest)) -> Some((fun c -> { c with Parry = Some v; FencingParry = true }), rest)
         | OWSStr "Parry" (Int (v, rest)) -> Some((fun c -> { c with Parry = Some v }), rest)
@@ -505,7 +510,7 @@ module Defaults =
             parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 thr+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
             parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 HPT Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             parse "Rock Mite: ST 12 HT 13 Speed 5.00 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
-            parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1 Rapid Strike"
+            parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Move 11 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1 Rapid Strike"
             parse "Cave Bear: ST 23 DX 11 IQ 4 HT 13 DR 2 Parry 9 Skill 13 2d thr+1 cut Berserk 9"
             parse "Watcher: ST 12 DX 18 HT 12 Speed 10 Dodge 14 Parry 13 Skill 18 sw cut Extra Parry 3 Extra Attack 3 Altered Time Rate"
             parse "Mafia Gunman [Mafia Gunmen]: ST 10 DX 12 HT 11 Skill 12 Cannot Be Parried 2d+2 pi"

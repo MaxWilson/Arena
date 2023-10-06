@@ -180,8 +180,8 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
         editBool "Unnaturally fragile" (stats.UnnaturallyFragile, (fun b -> { stats with UnnaturallyFragile = b } |> update))
         editBool "High Pain Threshold" (stats.HighPainThreshold, (fun b -> { stats with HighPainThreshold = b } |> update))
         editBool "Immune to shock, stun, unconsciousness" (stats.SupernaturalDurability, (fun b -> { stats with SupernaturalDurability = b } |> update))
-        editBerserkLevel "Berserk" (Some "") (stats.Berserk, [Mild; Moderate; Serious; Severe; Always], (fun v -> { stats with Berserk = v } |> update))
         editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
+        editNumber "Move" stats.Move_ (stats.Move, (fun n -> { stats with Move = n } |> update))
         editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
         editBool "Fencing Parry" (stats.FencingParry, (fun b -> { stats with FencingParry = b } |> update))
         editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
@@ -199,6 +199,7 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
         editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
         editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
         editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
+        editBerserkLevel "Berserk" (Some "") (stats.Berserk, [Mild; Moderate; Serious; Severe; Always], (fun v -> { stats with Berserk = v } |> update))
         class' "buttons" Html.div [
             let cancel _ = dispatch (SetPage Home)
             let save _ = dispatch (Upsert stats); dispatch (SetPage Home)

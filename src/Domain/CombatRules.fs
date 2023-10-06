@@ -252,7 +252,9 @@ module ExecuteAction =
 
     let doMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
         let startPos = ctx.geo.Find(ctx.me)
-        let endPos = match dest with Place p -> p | Person p -> ctx.geo.Find p
+        let goalPos = match dest with Place p -> p | Person p -> ctx.geo.Find p
+        let dist = ctx.geo.DistanceBetween(startPos, goalPos)
+        //if dist > ctx.me_.movementBudget
         notImpl "Movement/doMove"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
