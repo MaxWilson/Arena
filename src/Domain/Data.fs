@@ -248,7 +248,7 @@ module Data =
         blockUsed: bool
         parriesUsed: int
         maneuverBudget: int // use maneuvers to get movement and attacks
-        rapidStrikeBudget: int
+        rapidStrikeBudget: int option // None = no rapid strikes used, can become Some 2 by sacrificing an attack. But Some 0 = no more rapid strikes left this maneuver.
         attackBudget: int
         movementBudget: int
         stepBudget: int
@@ -268,7 +268,7 @@ module Data =
                 blockUsed = false
                 parriesUsed = 0
                 maneuverBudget = 1
-                rapidStrikeBudget = 0
+                rapidStrikeBudget = None
                 attackBudget = 0
                 movementBudget = 0
                 stepBudget = 0
@@ -285,7 +285,7 @@ module Data =
                 parriesUsed = 0
                 shockPenalty = 0
                 maneuverBudget = 1 + combatant.stats.AlteredTimeRate_
-                rapidStrikeBudget = 0
+                rapidStrikeBudget = None
                 attackBudget = 0
                 movementBudget = 0
                 stepBudget = 0
@@ -319,9 +319,9 @@ module Data =
     [<AutoOpen>]
     module CombatEvents =
         type Logged =
-            | Hit of Ids * DefenseDetails option * injury:int * Status list * string
-            | SuccessfulDefense of Ids * DefenseDetails * string
-            | Miss of Ids * string
+            | Hit of Ids * rapidStrike: bool * DefenseDetails option * injury:int * Status list * string
+            | SuccessfulDefense of Ids * rapidStrike: bool * DefenseDetails * string
+            | Miss of Ids * rapidStrike: bool * string
             | FallUnconscious of CombatantId * string
             | Unstun of CombatantId * string
             | StandUp of CombatantId * string
@@ -359,6 +359,38 @@ module Data =
         sideB: Opposition
         }
         with static member fresh setPosition = { sideA = []; sideB = Opposition.calibrated (None, None, None, TPK) setPosition }
+
+
+module Resourcing =
+    let (|ConsumeManeuver|_|) (c:Combatant) =
+        match c.maneuverBudget with
+        | n when n > 0 -> Some { c with maneuverBudget = c.maneuverBudget - 1 }
+        | _ -> None
+    let (|ConsumeAttack|_|) (c:Combatant) =
+        match c with
+        | c when c.attackBudget > 0 -> Some { c with attackBudget = c.attackBudget - 1}
+        | ConsumeManeuver c -> Some { c with attackBudget = c.attackBudget + c.stats.ExtraAttack_ } // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
+        | _ -> None
+    let (|ConsumeRapidStrike|_|) (c:Combatant) =
+        match c with
+        | { rapidStrikeBudget = Some n } as c when n > 0 -> Some { c with rapidStrikeBudget = Some (n - 1) }
+        | ConsumeAttack c -> Some { c with rapidStrikeBudget = Some 1 } // NOT rapidStrikeBudget = 2 because we are consuming one right now
+        | _ -> None
+    let (|AvailableMove|_|) (c:Combatant) =
+        match c with
+        | c when c.movementBudget > 0 -> Some (c.movementBudget, c)
+        | ConsumeManeuver c -> Some(c.movementBudget + 6, c) // TODO: get movement rate from stats instead of hardcoding 6
+        | _ -> None
+    let (|ConsumeDefense|_|) (defense: DefenseDetails option) (c: Combatant) =
+        match c.retreatFrom, defense with
+        | Some r, Some { retreatFrom = Some r' } when r <> r' -> None // can't retreat twice from two different enemies in the same turn
+        | _, None -> Some c // no defense = nothing to consume
+        | _, Some ({ retreatFrom = r' } as defense) ->
+            match defense.defense with
+            | Parry -> Some { c with parriesUsed = c.parriesUsed + 1; retreatFrom = r' }
+            | Block when (not c.blockUsed) -> Some { c with blockUsed = true; retreatFrom = r' }
+            | Dodge -> Some { c with retreatFrom = r' }
+            | _ -> None // illegal defense, probably a double block
 
 #nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing
 module Parser =

@@ -136,4 +136,11 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let db = [parse "Minotaur: ST 23 Berserk Auto"] |> List.map (fun c -> c.name, c) |> Map.ofList
         let c = createCombat db (Team.fresh [(1, "Minotaur")]) (Team.fresh [(1, "Minotaur")]) |> fun c -> c.combat
         verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.is Berserk) @>
+
+    testCase "Resourcing spot-checks" <| fun() ->
+        let inigo = Combatant.fresh(1, "Inigo Montoya", 1, { Creature.create "Inigo" with UseRapidStrike = true; ExtraAttack = Some 1 })
+        let after = match inigo with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
+        verify <@ after.rapidStrikeBudget = Some 1 @>
+        verify <@ after.attackBudget = 1 @>
+        verify <@ after.maneuverBudget = 0 @>
     ]

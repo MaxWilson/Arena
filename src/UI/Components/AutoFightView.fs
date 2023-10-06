@@ -323,7 +323,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                         //<img aria-label="⚔️" src="/assets/e7159ba0fcc85f39f95227dd85f44aeb.svg" alt="⚔️" draggable="false" class="emoji" data-type="emoji" data-name=":crossed_swords:">
                     let hpText hp = classP' "injury" Html.span [prop.text $"{hp} HP"]
                     match msg with
-                    | Hit (ids, _, injury, statusImpact, rollDetails) ->
+                    | Hit (ids, _, _, injury, statusImpact, rollDetails) ->
                         let hit verb =
                             div [bigHit; name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for "; hpText injury; viewDetails rollDetails]
                         match statusImpact with
@@ -334,13 +334,13 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                             div [bigHit; name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for"; hpText injury; viewDetails rollDetails]
                         | _ ->
                             div [regularHit; name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for "; hpText injury; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->
+                    | SuccessfulDefense(ids, _, { defense = Parry }, rollDetails) ->
                         div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, { defense = Block }, rollDetails) ->
+                    | SuccessfulDefense(ids, _, { defense = Block }, rollDetails) ->
                         div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, { defense = Dodge }, rollDetails) ->
+                    | SuccessfulDefense(ids, _, { defense = Dodge }, rollDetails) ->
                         div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
-                    | Miss (ids, rollDetails) ->
+                    | Miss (ids, _, rollDetails) ->
                         div [miss; name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
                     | FallUnconscious(id, rollDetails) ->
                         div [name id; Html.text " falls unconscious "; viewDetails rollDetails]

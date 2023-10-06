@@ -46,7 +46,9 @@ let justAttack : ActionBehavior = behavior {
         match target with
         | None -> return ()
         | Some target ->
-            let! rs = query(fun ctx -> ctx.me_.stats.UseRapidStrike)
+            let! rs = query(fun ctx ->
+                match ctx.me_ with Resourcing.ConsumeRapidStrike c when c.stats.UseRapidStrike -> true | _ -> false
+                )
             let! feedback, ctx = attack({ AttackDetails.create(target.Id) with rapidStrike = rs })
             return! loop (Some target.Id)
         }
