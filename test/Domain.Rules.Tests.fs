@@ -31,7 +31,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let gunman = Combatant.fresh(2, "Gunman", 3, { Creature.create "Gunman" with CannotBeParried = true })
         let create dodge parry block retreatUsed =
             let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
-            { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = if retreatUsed then Some previousAttacker.Id else None }
+            { Combatant.fresh(1, "test1", 1, stats) with retreatFrom = if retreatUsed then Some previousAttacker.Id else None }
         let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
             let combatant = { combatant with parriesUsed = parriesUsed; stats = f combatant.stats }
@@ -44,7 +44,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             let combatant = { create dodge parry block retreat with statusMods = conditions; injuryTaken = damage }
             chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefenseWithPriorRetreat dodge parry block previousRetreat =
-            let combatant = { create dodge parry block false with retreatUsed = Some previousRetreat }
+            let combatant = { create dodge parry block false with retreatFrom = Some previousRetreat }
             chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefenseFromGunman dodge parry block retreat =
             let combatant = create dodge parry block retreat

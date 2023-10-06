@@ -18,24 +18,26 @@ module Resourcing =
         | c when c.movementBudget > 0 -> Some (c.movementBudget, c) // no change to other fields needed
         | ConsumeManeuver c -> Some(c.movementBudget + 6, c) // TODO: get movement rate from stats instead of hardcoding 6
         | _ -> None
-
+    let (|ConsumeDefense|_|) (defense: DefenseDetails option) (c: Combatant) =
+        match c.retreatFrom, defense with
+        | Some r, Some { retreatFrom = Some r' } when r <> r' -> None // can't retreat twice from two different enemies in the same turn
+        | _, None -> Some c // no defense = nothing to consume
+        | _, Some ({ retreatFrom = r' } as defense) ->
+            match defense.defense with
+            | Parry -> Some { c with parriesUsed = c.parriesUsed + 1; retreatFrom = r' }
+            | Block when (not c.blockUsed) -> Some { c with blockUsed = true; retreatFrom = r' }
+            | Dodge -> Some { c with retreatFrom = r' }
+            | _ -> None // illegal defense, probably a double block
 
 module CombatEvents =
+    open Resourcing
     let update msg model =
         let updateCombat f (model: AugmentedCombat) = { model with AugmentedCombat.combat = f model.combat }
         let updateCombatant id (f: Combatant -> Combatant) = updateCombat <| fun (model: Combat) ->
             { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
         let updateCombatantWith (|Pattern|_|) id = updateCombatant id (function Pattern c -> c | _ -> shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase.")
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
-            updateCombatant id (fun c ->
-                match defense with
-                | Some defense ->
-                    { c with
-                        retreatUsed = c.retreatUsed |> Option.orElse defense.retreatFrom
-                        blockUsed = c.blockUsed || defense.defense = Block
-                        parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
-                        }
-                | None -> c)
+            updateCombatantWith ((|ConsumeDefense|_|) defense) id
         let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
@@ -57,14 +59,14 @@ module CombatEvents =
             match msg with
             | Hit (ids, defense, injury, statusImpact, rollDetails) ->
                 model
-                |> updateCombatantWith Resourcing.(|ConsumeAttack|_|) ids.attacker
+                |> updateCombatantWith (|ConsumeAttack|_|) ids.attacker
                 |> consumeDefense ids.target defense
                 |> takeDamage ids.target injury statusImpact
             | SuccessfulDefense(ids, defense, rollDetails) ->
                 model
-                    |> updateCombatantWith Resourcing.(|ConsumeAttack|_|) ids.attacker
+                    |> updateCombatantWith (|ConsumeAttack|_|) ids.attacker
                     |> consumeDefense ids.target (Some defense)
-            | Miss (ids, rollDetails) -> model |> updateCombatantWith Resourcing.(|ConsumeAttack|_|) ids.attacker
+            | Miss (ids, rollDetails) -> model |> updateCombatantWith (|ConsumeAttack|_|) ids.attacker
             | FallUnconscious(id, rollDetails) ->
                 model |> takeDamage id 0 [Unconscious]
             | Unstun(id, rollDetails) ->
@@ -73,7 +75,7 @@ module CombatEvents =
                         { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
             | StandUp(id, rollDetails) ->
                 model
-                    |> updateCombatantWith Resourcing.(|ConsumeAttack|_|) id
+                    |> updateCombatantWith (|ConsumeAttack|_|) id
                     |> updateCombatant id (fun c ->
                         { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
             | Info (id, _, _) -> model
@@ -94,7 +96,7 @@ let chooseDefense (attacker: Combatant) (victim: Combatant) =
     let canRetreat =
         (not <| victim.isAny [Dead; Unconscious; Stunned] )
         && (
-        match victim.retreatUsed with
+        match victim.retreatFrom with
         | Some id when id = attackerId -> true
         | None -> true
         | _ -> false)

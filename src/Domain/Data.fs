@@ -244,7 +244,7 @@ module Data =
         injuryTaken: int
         shockPenalty: int
         statusMods: Status list
-        retreatUsed: CombatantId option
+        retreatFrom: CombatantId option
         blockUsed: bool
         parriesUsed: int
         maneuverBudget: int // use maneuvers to get movement and attacks
@@ -264,7 +264,7 @@ module Data =
                 injuryTaken = 0
                 shockPenalty = 0
                 statusMods = if stats.Berserk = Some Always then [Berserk] else []
-                retreatUsed = None
+                retreatFrom = None
                 blockUsed = false
                 parriesUsed = 0
                 maneuverBudget = 1
@@ -280,7 +280,7 @@ module Data =
         static member newTurn (combatant: Combatant) =
             { combatant
                 with
-                retreatUsed = None
+                retreatFrom = None
                 blockUsed = false
                 parriesUsed = 0
                 shockPenalty = 0
