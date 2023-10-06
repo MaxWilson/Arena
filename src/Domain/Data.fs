@@ -369,13 +369,13 @@ module Resourcing =
     let (|ConsumeAttack|_|) (c:Combatant) =
         match c with
         | c when c.attackBudget > 0 -> Some { c with attackBudget = c.attackBudget - 1}
-        | ConsumeManeuver c -> Some { c with attackBudget = c.attackBudget + c.stats.ExtraAttack_ } // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
+        | ConsumeManeuver c -> Some { c with attackBudget = c.attackBudget + c.stats.ExtraAttack_; rapidStrikeBudget = None } // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
         | _ -> None
     let (|ConsumeRapidStrike|_|) (c:Combatant) =
         match c with
-        | { rapidStrikeBudget = Some n } as c when n > 0 -> Some { c with rapidStrikeBudget = Some (n - 1) }
-        | ConsumeAttack c -> Some { c with rapidStrikeBudget = Some 1 } // NOT rapidStrikeBudget = 2 because we are consuming one right now
-        | _ -> None
+        | { rapidStrikeBudget = Some n } when n > 0 -> Some { c with rapidStrikeBudget = Some (n - 1) }
+        | ConsumeAttack c when c.rapidStrikeBudget = None -> Some { c with rapidStrikeBudget = Some 1 } // NOT rapidStrikeBudget = 2 because we are consuming one right now.
+        | _ -> None // we've used up our rapid strikes this maneuver
     let (|AvailableMove|_|) (c:Combatant) =
         match c with
         | c when c.movementBudget > 0 -> Some (c.movementBudget, c)

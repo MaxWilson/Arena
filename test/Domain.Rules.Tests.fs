@@ -5,6 +5,7 @@ open Domain.Random
 open Domain.Behavior
 open Domain.CombatRules
 let verify = Swensen.Unquote.Assertions.test
+let shouldFail = Swensen.Unquote.Assertions.raises
 
 // Slightly simpler version of DefenseDetails to make test output easier to read
 type DefenseResult = { defense: DefenseType; targetRetreated: bool }
@@ -138,7 +139,9 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.is Berserk) @>
 
     testCase "Resourcing spot-checks" <| fun() ->
-        let inigo = Combatant.fresh(1, "Inigo Montoya", 1, { Creature.create "Inigo" with UseRapidStrike = true; ExtraAttack = Some 1 })
+        let inigo =
+            Combatant.fresh(1, "Inigo Montoya", 1, { Creature.create "Inigo" with UseRapidStrike = true; ExtraAttack = Some 1 })
+            |> Combatant.newTurn
         let after = match inigo with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
         verify <@ after.rapidStrikeBudget = Some 1 @>
         verify <@ after.attackBudget = 1 @>
@@ -147,7 +150,8 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ after.rapidStrikeBudget = Some 0 @>
         verify <@ after.attackBudget = 1 @>
         verify <@ after.maneuverBudget = 0 @>
-        let after = match after with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
+        Swensen.Unquote.Assertions.raises<System.InvalidOperationException> <@ match after with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v @>
+        let after = match after with | Resourcing.ConsumeAttack c -> c | v -> matchfail v
         verify <@ after.rapidStrikeBudget = Some 0 @>
         verify <@ after.attackBudget = 0 @>
         verify <@ after.maneuverBudget = 0 @>
