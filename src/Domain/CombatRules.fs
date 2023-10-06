@@ -136,15 +136,16 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
 
 module ExecuteAction =
     open Coroutine
-    let doAttack (cqrsExecute: CombatEvents.Event -> unit) (ctx: ActionContext) (details: AttackDetails) : unit =
+    let doAttack msg (cqrsExecute: CombatEvents.Event -> unit) (ctx: ActionContext) (details: AttackDetails) : unit =
+        let mutable msg = msg
+        let recordMsg txt =
+            if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
         let attacker = ctx.me_
         let combat = ctx.combat
         let loggedExecute = Logged >> cqrsExecute
-        let recordMsg = notImpl()
+        let isRapidStrike = details.rapidStrike
         let attempt = notImpl()
         let detailedAttempt = notImpl()
-        let rapidStrikes = notImpl()
-        let isRapidStrike = notImpl()
         let checkGoesUnconscious = notImpl()
         let roll3d6 = notImpl()
         let msg = notImpl()
@@ -239,9 +240,9 @@ module ExecuteAction =
             |> Logged |> cqrsExecute
     let doMove = notImpl
 
-    let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
+    let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
-        let rec attempt (behavior as unchanged) =
+        let rec attempt msg (behavior as unchanged) =
             let ctx = getCtx()
             match (behavior(feedback, ctx)) with
             | Finished () -> None
@@ -250,8 +251,8 @@ module ExecuteAction =
                 let me = ctx.me_
                 if me.maneuverBudget = 0 && ctx.me_.attackBudget = 0 then Some unchanged // illegal to attack right now; block until an attack is available, so we can retry the behavior next round
                 else
-                    doAttack cqrsExecute ctx details
-                    attempt followup
+                    doAttack msg cqrsExecute ctx details
+                    attempt "" followup
             | AwaitingAction(Move(pos), followup) ->
                 let me = ctx.me_
                 // check that we have enough movement points/maneuvers available...
@@ -260,8 +261,8 @@ module ExecuteAction =
                     // then cqrsExecute the appropriate commands
                     // cqrsExecute a bunch of stuff and then...
                     doMove cqrsExecute ctx pos
-                    attempt followup
-        attempt behavior
+                    attempt "" followup
+        attempt msg behavior
 
 let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
     // HIGH speed and DX goes first so we use the negative of those values
@@ -310,7 +311,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
             elif cqrs.State.behaviors.ContainsKey attacker.Id then
                 let behavior = cqrs.State.behaviors[attacker.Id]
                 let getCtx() = { combat = cqrs.State.combat; me = attacker.Id }
-                SetBehavior(attacker.Id, ExecuteAction.iterateBehavior cqrs.Execute getCtx behavior) |> silentExecute
+                SetBehavior(attacker.Id, ExecuteAction.iterateBehavior msg cqrs.Execute getCtx behavior) |> silentExecute
             // this other stuff needs to get refactored into the behavior system
             elif attacker.is Prone then
                 StandUp(attacker.Id, msg)
