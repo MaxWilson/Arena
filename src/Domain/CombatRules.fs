@@ -136,9 +136,107 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
 
 module ExecuteAction =
     open Coroutine
-    let doAttack (cqrsExecute: _ -> unit) (ctx: ActionContext) (details: AttackDetails) =
-        notImpl "cqrsExecute a bunch of stuff"
-        ()
+    let doAttack (cqrsExecute: CombatEvents.Event -> unit) (ctx: ActionContext) (details: AttackDetails) : unit =
+        let attacker = ctx.me_
+        let combat = ctx.combat
+        let loggedExecute = Logged >> cqrsExecute
+        let recordMsg = notImpl()
+        let attempt = notImpl()
+        let detailedAttempt = notImpl()
+        let rapidStrikes = notImpl()
+        let isRapidStrike = notImpl()
+        let checkGoesUnconscious = notImpl()
+        let roll3d6 = notImpl()
+        let msg = notImpl()
+        let victim = combat.combatants[details.target]
+        let skill, defensePenalty =
+            let rapidStrikePenalty =
+                if isRapidStrike then
+                    let penalty = if attacker.stats.WeaponMaster then -3 else -6
+                    recordMsg $"Using Rapid Strike %+d{penalty}"
+                    penalty
+                else 0
+            if attacker.shockPenalty <> 0 then
+                recordMsg $"Shock penalty %+d{attacker.shockPenalty}"
+            match (attacker.stats.WeaponSkill_ + attacker.shockPenalty + rapidStrikePenalty) with
+            | n when  n >= 18 ->
+                let deceptive = (n - 16)/2
+                recordMsg $"Using Deceptive Attack {-2 * deceptive}"
+                n - deceptive * 2, deceptive
+            | n -> n, 0
+        match detailedAttempt "Attack" skill with
+        | (Success _ | CritSuccess _) as success ->
+            let defenseTarget, defense = chooseDefense attacker victim
+            let defenseLabel =
+                (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
+                + (if defense.targetRetreated then " and retreat" else "")
+            let critSuccess = match success with CritSuccess _ -> true | _ -> false
+            if not (critSuccess || victim.is Berserk) && attempt defenseLabel (defenseTarget - defensePenalty) then
+                SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
+            else
+                let defense =
+                    if critSuccess then None
+                    else Some defense
+                let damageCap damageType = max (if damageType = Some Crushing then 0 else 1)
+                let dmg = attacker.stats.Damage_.roll() |> damageCap attacker.stats.DamageType
+                let penetratingDmg = dmg - victim.stats.DR_ |> max 0
+                let toInjury (penetratingDmg, damageType) =
+                    match victim.stats.InjuryTolerance, damageType with
+                    | Some Diffuse, Some (Impaling | Piercing) -> max 1 penetratingDmg
+                    | Some Diffuse, _ -> max 2 penetratingDmg
+                    | Some Homogeneous, Some Impaling -> penetratingDmg / 2
+                    | Some Homogeneous, Some Piercing -> penetratingDmg / 5
+                    | Some Unliving, Some Impaling -> penetratingDmg
+                    | Some Unliving, Some Piercing -> penetratingDmg / 3
+                    | _, Some Cutting -> (float penetratingDmg * 1.5) |> int
+                    | _, Some Impaling -> penetratingDmg * 2
+                    | _ -> penetratingDmg
+                let injury = toInjury (penetratingDmg, attacker.stats.DamageType)
+                // add followup damage, and log the total damage and injury
+                let injury =
+                    match attacker.stats.FollowupDamage with
+                    | Some r when penetratingDmg > 0 ->
+                        let followup, followupType = (r.roll() |> damageCap attacker.stats.FollowupDamageType, attacker.stats.FollowupDamageType)
+                        let injury = injury + toInjury (followup, followupType)
+                        recordMsg $"Damage {attacker.stats.Damage_} + {r} ({dmg} {defaultArg attacker.stats.DamageType Other}, {followup} {defaultArg followupType Other}) - DR {victim.stats.DR_} = {injury} injury"
+                        injury
+                    | _ ->
+                        recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
+                        injury
+                let mutable newConditions = []
+                let mutable berserk = victim.is Berserk
+                match victim.stats.Berserk with
+                | Some berserkLevel when (float injury > float victim.stats.HP_ / 4. && victim.isnt Berserk) ->
+                    let target =
+                        match berserkLevel with Mild -> 15 | Moderate -> 12 | Serious -> 9 | Severe -> 6 | Always -> 0
+                    // we deliberately don't use attempt here because we don't want to clutter the log with self-control rolls
+                    if (roll3d6() <= target = false) then
+                        recordMsg $"{victim.personalName} goes berserk"
+                        newConditions <- newConditions@[Berserk]
+                        berserk <- true
+                | _ -> ()
+                let hp' = victim.CurrentHP_ - injury
+                // -5 x max HP is auto-death
+                let autodeathThreshold = victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5)
+                if hp' <= autodeathThreshold then
+                    recordMsg $"Auto-death occurs at {autodeathThreshold} HP"
+                    newConditions <- [Dead]
+                // check for death if crossing a HP threshold, -1 x max HP or below
+                elif failedDeathcheck (fun threshold -> attempt $"Deathcheck at {threshold} HP" (victim.stats.HT_ + if berserk then +4 else 0))
+                        victim.stats.HP_ victim.CurrentHP_ hp' then
+                    newConditions <- [Dead]
+                // check for unconsciousness on dropping to zero HP
+                elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious (victim, berserk) injury then
+                    newConditions <- [Unconscious]
+                elif injury > (victim.stats.HP_ + 1) / 2 && not (victim.stats.SupernaturalDurability || berserk)
+                        && (attempt "Knockdown check" (victim.stats.HT_ +
+                            if victim.stats.HighPainThreshold then +3 else 0) |> not) then
+                    newConditions <- [Stunned; Prone]
+                Hit({ attacker = attacker.Id; target = victim.Id }, defense, injury, newConditions, msg)
+            |> loggedExecute
+        | (Fail _ | CritFail _) ->
+            Miss({ attacker = attacker.Id; target = victim.Id }, msg)
+            |> Logged |> cqrsExecute
     let doMove = notImpl
 
     let rec iterateBehavior (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
@@ -212,7 +310,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
             elif cqrs.State.behaviors.ContainsKey attacker.Id then
                 let behavior = cqrs.State.behaviors[attacker.Id]
                 let getCtx() = { combat = cqrs.State.combat; me = attacker.Id }
-                SetBehavior(attacker.Id, ExecuteAction.iterateBehavior loggedExecute getCtx behavior) |> silentExecute
+                SetBehavior(attacker.Id, ExecuteAction.iterateBehavior cqrs.Execute getCtx behavior) |> silentExecute
             // this other stuff needs to get refactored into the behavior system
             elif attacker.is Prone then
                 StandUp(attacker.Id, msg)
@@ -317,7 +415,6 @@ let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
                                 Info(attacker.Id, "can't find a victim", msg)
                             |> loggedExecute
                             msg <- "" // if multiple attacks process we don't want to redisplay the same text
-
 
 let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) =
     let rec loop counter =
