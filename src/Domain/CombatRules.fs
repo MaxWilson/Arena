@@ -7,13 +7,15 @@ open Domain.Geo
 module CombatEvents =
     open Resourcing
     let update msg model =
+        let illegal() = shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase."
         let updateCombat f (model: AugmentedCombat) = { model with AugmentedCombat.combat = f model.combat }
         let updateCombatant id (f: Combatant -> Combatant) = updateCombat <| fun (model: Combat) ->
             { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
         let updateCombatantWith (|Pattern|_|) id =
-            updateCombatant id (function Pattern c -> c | _ -> shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase.")
+            updateCombatant id (function Pattern c -> c | _ -> illegal())
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatantWith ((|ConsumeDefense|_|) defense) id
+        let consumeMovement mv id = updateCombatant id (function AvailableMove(moves, c) -> { c with movementBudget = moves - mv } | _ -> illegal())
         let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
@@ -57,6 +59,8 @@ module CombatEvents =
                         { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
             | Info (id, _, _) -> model
             | NewRound _ -> model
+            | MoveTo (id, dest, mv, _) ->
+                { (consumeMovement mv id model) with combat = { model.combat with geo = model.combat.geo |> Geo.place id dest } }
 
 let successTest target x =
     if x >= target + 10 then CritFail (x - target)
@@ -150,7 +154,7 @@ module ExecuteAction =
     let checkGoesUnconscious attempt (self: Combatant, isBerserk) incomingDamage =
         let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
         attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
-    let doAttack msg (cqrsExecute: CombatEvents.Event -> unit) (ctx: ActionContext) (details: AttackDetails) =
+    let doAttack msg (cqrsExecute: CombatAtoms.Atom -> unit) (ctx: ActionContext) (details: AttackDetails) =
         let mutable msg = msg
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
@@ -252,18 +256,29 @@ module ExecuteAction =
 
     let doMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
         let startPos = ctx.geo.Find(ctx.me)
-        let goalPos = match dest with Place p -> p | Person p -> ctx.geo.Find p
-        let dist = ctx.geo.DistanceBetween(startPos, goalPos)
-        match ctx.me_ with
-        | AvailableMove(move, me) ->
-            if (float move * 1.<yards>) <= dist then
-                notImpl "Move directly to goalPos"
-            else notImpl "Move partway there"
+        match ctx.me_, dest with
+        | AvailableMove(move, me), Person p ->
+            let line = ctx.geo.LineFrom(me.Id, p)
+            let dist = min (float move * 1.<yards>) (line.Length - yards 1.) |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
+            let goalPos = line.Extend dist
+            let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
+            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves {dist} yards toward {ctx.combat.combatants[p].personalName}")))
+        | AvailableMove(move, me), Place coords ->
+            let line = ctx.geo.LineFrom(ctx.geo.Find me.Id, coords)
+            let dist = min (float move * 1.<yards>) line.Length |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
+            let goalPos = line.Extend dist
+            let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
+            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves {dist} yards")))
         | _ -> shouldntHappen "We should have already checked move"
+
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
-        let rec attempt msg (behavior as unchanged) =
+        let rec attempt counter msg (behavior as unchanged) =
             let ctx = getCtx()
+#if DEBUG
+            if counter > 1000 then shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop"
+#endif
+            let attempt = attempt (counter + 1)
             match (behavior(feedback, ctx), ctx.me_) with
             | Finished (), _ -> None
             | AwaitingAction(Yield, behavior), _ -> Some behavior // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
@@ -278,7 +293,7 @@ module ExecuteAction =
                 doMove msg cqrsExecute ctx dest
                 attempt "" followup
             | AwaitingAction(action, _), _ -> Some unchanged // We can't afford this action now. Treat it as if it were a Yield: rerun the original behavior next turn and see if the same action is requested/affordable.
-        attempt msg behavior
+        attempt 0 msg behavior
 
 let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
     // HIGH speed and DX goes first so we use the negative of those values

@@ -35,7 +35,7 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
 let query(f: ActionContext -> _) = QueryRequest f
 let attack details = ReturnAction (Attack details)
 // move toward is a finite behavior, stops when you get within 1 yard of the target
-let rec moveToward targetId: ActionBehavior = behavior {
+let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     let! geo, dist = query(fun ctx -> ctx.geo, ctx.geo.DistanceBetween(ctx.me, targetId))
     if dist <= 1.0<yards> then
         return () // done! We're in range, can do something else now.

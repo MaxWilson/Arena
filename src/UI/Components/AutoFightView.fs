@@ -351,6 +351,8 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                         div [name id; Html.text " stands up "; viewDetails rollDetails]
                     | Info (id, msg, rollDetails) ->
                         div [name id; Html.text $" {msg}"; viewDetails rollDetails]
+                    | MoveTo (id, coords, _, describe) ->
+                        div [name id; Html.text $" {describe}"]
                     | NewRound n ->
                         header $"Round {n} starts"
             ]

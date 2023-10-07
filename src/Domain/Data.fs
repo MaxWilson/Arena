@@ -5,6 +5,7 @@ module Data =
     open Domain.Random
 
     [<Measure>] type yards
+    let inline yards (n: float) = n * 1.<yards>
     type 't prop = 't option
     type DamageType = Cutting | Impaling | Crushing | Piercing | Burning | Other
         with
@@ -321,32 +322,6 @@ module Data =
     type DefenseType = Parry | Block | Dodge
     type DefenseDetails = { defense: DefenseType; retreatFrom: CombatantId option }
         with member this.targetRetreated = this.retreatFrom.IsSome
-
-    [<AutoOpen>]
-    module CombatEvents =
-        type Logged =
-            | Hit of Ids * rapidStrike: bool * DefenseDetails option * injury:int * Status list * string
-            | SuccessfulDefense of Ids * rapidStrike: bool * DefenseDetails * string
-            | Miss of Ids * rapidStrike: bool * string
-            | FallUnconscious of CombatantId * string
-            | Unstun of CombatantId * string
-            | StandUp of CombatantId * string
-            | Info of CombatantId * msg: string * rollInfo: string
-            | NewRound of int
-        type HouseKeeping =
-            | NewTurn of CombatantId
-            | SetBehavior of CombatantId * ActionBehavior option
-        type Event = Logged of Logged | Unlogged of HouseKeeping
-    type AugmentedCombatLog = (Event option * AugmentedCombat) list
-    type CombatLog = (Logged option * Combat) list
-
-    type DefeatCriteria =
-        | TPK
-        | OneCasualty
-        | HalfCasualties
-    type FightResult =
-        | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
-        | SpecificResult of CombatLog * {| victors: int list |}
     type Outcome = CritSuccess of int | Success of int | CritFail of int | Fail of int
     type 'members GroupSetup = {
         members: 'members
@@ -355,6 +330,10 @@ module Data =
         }
     type GroupSetup = ((int * string) list) GroupSetup
     type TeamSetup = GroupSetup list
+    type DefeatCriteria =
+        | TPK
+        | OneCasualty
+        | HalfCasualties
     type Opposition =
     | Calibrate of GroupSetup<string option * int option * int option * DefeatCriteria>
     | Specific of GroupSetup list
@@ -365,6 +344,29 @@ module Data =
         sideB: Opposition
         }
         with static member fresh setPosition = { sideA = []; sideB = Opposition.calibrated (None, None, None, TPK) setPosition }
+
+    [<AutoOpen>]
+    module CombatAtoms =
+        type Logged =
+            | Hit of Ids * rapidStrike: bool * DefenseDetails option * injury:int * Status list * string
+            | SuccessfulDefense of Ids * rapidStrike: bool * DefenseDetails * string
+            | Miss of Ids * rapidStrike: bool * string
+            | FallUnconscious of CombatantId * string
+            | Unstun of CombatantId * string
+            | StandUp of CombatantId * string
+            | Info of CombatantId * msg: string * rollInfo: string
+            | MoveTo of CombatantId * Coords * movementPointsSpent: int * describe:string
+            | NewRound of int
+        type HouseKeeping =
+            | NewTurn of CombatantId
+            | SetBehavior of CombatantId * ActionBehavior option
+        type Atom = Logged of Logged | Unlogged of HouseKeeping
+    type AugmentedCombatLog = (Atom option * AugmentedCombat) list
+    type CombatLog = (Logged option * Combat) list
+
+    type FightResult =
+        | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
+        | SpecificResult of CombatLog * {| victors: int list |}
 
 
 module Resourcing =
