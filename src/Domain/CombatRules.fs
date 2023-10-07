@@ -4,19 +4,18 @@ open Domain.Random
 open Domain.Behavior
 open Domain.Geo
 
-module CombatEvents =
+module CombatAtom =
     open Resourcing
-    let update msg model =
+    let updateCombatant id (f: Combatant -> Combatant) (model: Combat) =
+        { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
+    let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
+    let updateCombat msg model =
         let illegal() = shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase."
-        let updateCombat f (model: AugmentedCombat) = { model with AugmentedCombat.combat = f model.combat }
-        let updateCombatant id (f: Combatant -> Combatant) = updateCombat <| fun (model: Combat) ->
-            { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
         let updateCombatantWith (|Pattern|_|) id =
             updateCombatant id (function Pattern c -> c | _ -> illegal())
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatantWith ((|ConsumeDefense|_|) defense) id
         let consumeMovement mv id = updateCombatant id (function AvailableMove(moves, c) -> { c with movementBudget = moves - mv } | _ -> illegal())
-        let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
                 let goingBerserk = conditions |> List.contains Berserk
@@ -31,36 +30,39 @@ module CombatEvents =
                     })
         let consumeAttack rapidStrike = updateCombatantWith (if rapidStrike then (|ConsumeRapidStrike|_|) else (|ConsumeAttack|_|))
         match msg with
-        | Unlogged(NewTurn id) -> model |> newTurn id
+        | Hit (ids, rapidStrike, defense, injury, statusImpact, rollDetails) ->
+            model
+            |> consumeAttack rapidStrike ids.attacker
+            |> consumeDefense ids.target defense
+            |> takeDamage ids.target injury statusImpact
+        | SuccessfulDefense(ids, rapidStrike, defense, rollDetails) ->
+            model
+                |> consumeAttack rapidStrike ids.attacker
+                |> consumeDefense ids.target (Some defense)
+        | Miss (ids, rapidStrike, rollDetails) -> model |> consumeAttack rapidStrike ids.attacker
+        | FallUnconscious(id, rollDetails) ->
+            model |> takeDamage id 0 [Unconscious]
+        | Unstun(id, rollDetails) ->
+            model
+                |> updateCombatant id (fun c ->
+                    { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
+        | StandUp(id, rollDetails) ->
+            model
+                |> updateCombatantWith (|ConsumeManeuver|_|) id
+                |> updateCombatant id (fun c ->
+                    { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
+        | Info (id, _, _) -> model
+        | NewRound _ -> model
+        | MoveTo (id, dest, mv, _) ->
+            let place id dest model = { model with geo = model.geo |> Geo.place id dest }
+            (consumeMovement mv id model) |> place id dest
+    let update msg model =
+        match msg with
+        | Unlogged(NewTurn id) -> { model with AugmentedCombat.combat = model.combat |> newTurn id }
         | Unlogged(SetBehavior (id, None)) -> { model with behaviors = model.behaviors |> Map.remove id }
         | Unlogged(SetBehavior (id, Some bhv)) -> { model with behaviors = model.behaviors |> Map.add id bhv }
         | Logged msg ->
-            match msg with
-            | Hit (ids, rapidStrike, defense, injury, statusImpact, rollDetails) ->
-                model
-                |> consumeAttack rapidStrike ids.attacker
-                |> consumeDefense ids.target defense
-                |> takeDamage ids.target injury statusImpact
-            | SuccessfulDefense(ids, rapidStrike, defense, rollDetails) ->
-                model
-                    |> consumeAttack rapidStrike ids.attacker
-                    |> consumeDefense ids.target (Some defense)
-            | Miss (ids, rapidStrike, rollDetails) -> model |> consumeAttack rapidStrike ids.attacker
-            | FallUnconscious(id, rollDetails) ->
-                model |> takeDamage id 0 [Unconscious]
-            | Unstun(id, rollDetails) ->
-                model
-                    |> updateCombatant id (fun c ->
-                        { c with statusMods = c.statusMods |> List.filter ((<>) Stunned) })
-            | StandUp(id, rollDetails) ->
-                model
-                    |> updateCombatantWith (|ConsumeManeuver|_|) id
-                    |> updateCombatant id (fun c ->
-                        { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
-            | Info (id, _, _) -> model
-            | NewRound _ -> model
-            | MoveTo (id, dest, mv, _) ->
-                { model with combat = { (consumeMovement mv id model).combat with geo = model.combat.geo |> Geo.place id dest } }
+            { model with AugmentedCombat.combat = updateCombat msg model.combat }
 
 let successTest target x =
     if x >= target + 10 then CritFail (x - target)
@@ -419,7 +421,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
 let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), aug -> Some(Some msg, aug.combat) | None, aug -> Some(None, aug.combat))
 
 let specificFight db team1 team2 = async {
-    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatEvents.update)
+    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatAtom.update)
     let victors = fight cqrs
     return (cqrs.LogWithMessages() |> loggedOnly), victors
     }
@@ -440,7 +442,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
     let runForN n = async {
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
         let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
-        let cqrs = CQRS.CQRS.Create(combat, CombatEvents.update)
+        let cqrs = CQRS.CQRS.Create(combat, CombatAtom.update)
         return cqrs, fight cqrs
         }
     let mutable results: Map<_,int*AugmentedCombatLog> = Map.empty

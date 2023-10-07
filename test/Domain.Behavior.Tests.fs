@@ -48,4 +48,26 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
         doCheckActionFor (Move(Place(10000.<yards>,0.<yards>))) woundedBob
         // but when he's healed, he should resume attacking
         doCheckActionFor (Attack(AttackDetails.create(2, "Bob"))) combat // each time we get a new behavior, which should be an attack
+    testCase "justAttack should move if needed" <| fun () ->
+        let teamOf m coords =
+            [{  members = m
+                center = coords
+                radius = Some 0.<yards>
+                }]
+        // we don't care who's in the combat as long as there's someone on both sides and they're in range of each other
+        let combat = createCombat (["Bob", Creature.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] (0.<yards>, 2.<yards>)) |> fun c -> c.combat
+
+        let bob = combat.combatants.Keys |> Seq.head
+        let toCtx combat = { me = bob; combat = combat }
+
+        let mutable BobsBhv = justAttack // todo: move this mutable field onto Bob himself
+        let doCheckActionFor expected combat = // note that this updates BobsBhv
+            match run BobsBhv ((), toCtx combat) with
+            | Finished () -> failwith "Bob should always be either attacking or fleeing until his opponent dies, which shouldn't happen in this test."
+            | AwaitingAction(action, nextBehavior) ->
+                BobsBhv <- nextBehavior
+                // we don't actually DO the action in this test but we verify that it's an attack on the other Bob
+                verify <@ action = expected @>
+        doCheckActionFor (Move(Person (2, "Bob"))) combat // the first time we should get a move
+        doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) (combat |> CombatAtom.updateCombat (MoveTo((2, "Bob"), (yards 0., yards 1.), 0, ""))) // but when we're in reach we should just attack
     ]
