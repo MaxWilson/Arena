@@ -37,15 +37,19 @@ let attack details = ReturnAction (Attack details)
 // move toward is a finite behavior, stops when you get within 1 yard of the target
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     let! geo, dist = query(fun ctx -> ctx.geo, ctx.geo.DistanceBetween(ctx.me, targetId))
+    printfn "Dist = %A" dist
     if dist <= 1.01<yards> then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
         return () // done! We're in range, can do something else now.
     else
+        printfn "Need to move"
         let! feedback, ctx = ReturnAction(Move(Person targetId))
         return! moveToward targetId
     }
 
 let justAttack : ActionBehavior = behavior {
+    printfn "Started justAttack"
     let rec loop targetId = behavior {
+        printfn "Just re-entered justAttack loop"
         let! target = query(fun ctx ->
             match targetId with
             | Some targetId ->
@@ -54,20 +58,28 @@ let justAttack : ActionBehavior = behavior {
                 else tryFindTarget ctx.combat ctx.me_
             | None -> tryFindTarget ctx.combat ctx.me_
             )
+        printfn "Queried and got: %A" target
         match target with
-        | None -> return ()
+        | None ->
+            printfn "Couldn't find a target"
+            return ()
         | Some target ->
-            match! RunChildRequest (moveToward target.Id) with
+            printfn "Still have a target"
+            let! response = RunChildRequest (moveToward target.Id)
+            match response with
             | Finished() ->
+                printfn "Didn't need to move, continuing"
                 let! rs = query(fun ctx ->
                     match ctx.me_ with Resourcing.ConsumeRapidStrike c when c.stats.UseRapidStrike -> true | _ -> false
                     )
                 let! feedback, ctx = attack({ AttackDetails.create(target.Id) with rapidStrike = rs })
                 return! loop (Some target.Id)
             | AwaitingAction(action, followup) ->
+                printfn "Need to move, let's do that and then continue..."
                 let! feedback, ctx = ReturnAction action
                 return! loop (Some target.Id)
         }
+    printfn "About to enter justAttack loop for the first time"
     return! loop None
     }
 
