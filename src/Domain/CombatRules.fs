@@ -60,7 +60,7 @@ module CombatEvents =
             | Info (id, _, _) -> model
             | NewRound _ -> model
             | MoveTo (id, dest, mv, _) ->
-                { (consumeMovement mv id model) with combat = { model.combat with geo = model.combat.geo |> Geo.place id dest } }
+                { model with combat = { (consumeMovement mv id model).combat with geo = model.combat.geo |> Geo.place id dest } }
 
 let successTest target x =
     if x >= target + 10 then CritFail (x - target)
