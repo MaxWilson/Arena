@@ -288,8 +288,7 @@ module ExecuteAction =
             | AwaitingAction(Attack(details), followup), ConsumeAttack me -> // NOT a rapid strike because we can't afford one
                 doAttack msg cqrsExecute ctx { details with rapidStrike = false }
                 attempt "" followup
-            | AwaitingAction(Move(dest), followup), AvailableMove me ->
-                let me = ctx.me_
+            | AwaitingAction(Move(dest), followup), AvailableMove (points, me) ->
                 doMove msg cqrsExecute ctx dest
                 attempt "" followup
             | AwaitingAction(action, _), _ -> Some unchanged // We can't afford this action now. Treat it as if it were a Yield: rerun the original behavior next turn and see if the same action is requested/affordable.

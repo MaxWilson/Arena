@@ -37,7 +37,7 @@ let attack details = ReturnAction (Attack details)
 // move toward is a finite behavior, stops when you get within 1 yard of the target
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     let! geo, dist = query(fun ctx -> ctx.geo, ctx.geo.DistanceBetween(ctx.me, targetId))
-    if dist <= 1.0<yards> then
+    if dist <= 1.01<yards> then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
         return () // done! We're in range, can do something else now.
     else
         let! feedback, ctx = ReturnAction(Move(Person targetId))
