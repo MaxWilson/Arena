@@ -392,7 +392,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
     let mutable occupiedCells = Set.empty
     let place (group: GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, radius_ group
-        let gen() =
+        let gen (radius: float<yards>) =
             let angleRadians = random.NextDouble() * 2. * System.Math.PI
             let radius = random.NextDouble() * radius
             let x = cos angleRadians * radius + fst center |> Ops.round
@@ -401,12 +401,12 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
         let rec findEmptyCoords failureCount radius candidate =
             let x,y = candidate
             if occupiedCells.Contains (int x, int y) then
-                if failureCount > 10 then findEmptyCoords 0 (radius + 1.<yards>) (gen()) // maybe it's full; widen the radius so we don't get stuck in an infinite loop
-                else findEmptyCoords (failureCount+1) radius (gen())
+                if failureCount > 10 then findEmptyCoords 0 (radius + 1.<yards>) (gen radius) // maybe it's full; widen the radius so we don't get stuck in an infinite loop
+                else findEmptyCoords (failureCount+1) radius (gen radius)
             else
                 occupiedCells <- occupiedCells.Add (int x, int y)
                 candidate
-        combatant, findEmptyCoords 0 radius (gen())
+        combatant, findEmptyCoords 0 radius (gen radius)
     let setup = (team1 |> (toCombatants db 1 place)) @ (team2 |> (toCombatants db 2 place))
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
     let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Geo.ofList
