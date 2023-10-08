@@ -210,6 +210,8 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                             circle [
                                 Circle.radius (r.scaleX 0.5<yards>)
                                 Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
+                                if c.isAny [Dead; Unconscious] then
+                                    Circle.opacity 0.2
                                 Circle.key "outline"
                                 Circle.onMouseOver (fun e ->
                                     e.target.getStage().container().style.cursor <- CursorType.Pointer
@@ -225,7 +227,7 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                                     Circle.strokeWidth 1
                                 ]
                             if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
-                                let label = c.personalName
+                                let label = if c.is Dead then $"Dead {c.personalName}" elif c.is Unconscious then $"Unconscious {c.personalName}" else c.personalName
                                 let textWidth = label.Length * 14
                                 Rect.create [
                                     Rect.key "hoverBackground"
