@@ -6,6 +6,7 @@ module Data =
 
     [<Measure>] type yards
     let inline yards (n: float) = n * 1.<yards>
+    let inline coords (x, y) = yards x, yards y
     type 't prop = 't option
     type DamageType = Cutting | Impaling | Crushing | Piercing | Burning | Other
         with
