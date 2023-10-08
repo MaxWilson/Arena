@@ -1,6 +1,6 @@
 # Shining Sword Arena
 
-https://maxwilson.github.io/POCArena/
+https://maxwilson.github.io/Arena/
 
 Proof of concept for Shining Sword arena. Rule system-agnostic presentation layer with terrain and animation support.
 
