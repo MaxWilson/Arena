@@ -5,8 +5,11 @@ and Behavior<'actionOut, 'feedback, 'ctx, 'finalResult> = 'feedback * 'ctx -> Ex
 and RunChildRequest<'actionOut, 'feedback, 'ctx, 'finalResult> = RunChildRequest of Behavior<'actionOut, 'feedback, 'ctx, 'finalResult>
 type ReturnAction<'actionOut> = ReturnAction of 'actionOut
 type QueryRequest<'ctx, 'result> = QueryRequest of ('ctx -> 'result)
-let run logic (feedback, ctx) = logic(feedback, ctx)
-
+let run logic (feedback, ctx) =
+    printfn "Run run()"
+    let x = logic(feedback, ctx)
+    printfn "Ran run()"
+    x
 type BehaviorBuilder() =
     member this.Delay f = f
     member this.Run b = fun (feedback, ctx) -> b()(feedback, ctx)
@@ -15,7 +18,9 @@ type BehaviorBuilder() =
     // member this.Bind(b, f) = bind b f
     member this.Bind(ReturnAction(action), binder: _ -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
         fun (feedback, context) ->
+            printfn "Running ReturnAction binder"
             let followupRoutine = binder (feedback, context)
+            printfn "Ran ReturnAction binder"
             (* consider a block of behavior that looks like this:
 
                let! feedback, context = ReturnAction(SimpleAttack)
@@ -38,12 +43,18 @@ type BehaviorBuilder() =
             run (binder r) (feedback, ctx)
     member this.Bind(RunChildRequest(lhs: Behavior<_,_,_,_>), binder: ExecutionResult<_,_,_,_> -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
         fun(feedback, ctx) ->
+            printfn "About to run child"
             let r: ExecutionResult<_,_,_,_> = run lhs (feedback, ctx)
+            printfn "Ran child request, got back %A" r
             match r with
             | AwaitingAction(action, _) ->
+                printfn "Child is blocked, waiting for action--about to run binder anyway"
                 AwaitingAction(action, binder r) // See below, but this is effectively Action: Attack(followup: cowardly justAttack)
             | Finished result ->
-                binder r (feedback, ctx) // yes, we're re-using the feedback. That might be a mistake.
+                printfn "Child finished, about to run binder"
+                let x = binder r (feedback, ctx) // yes, we're re-using the feedback. That might be a mistake.
+                printfn "Ran binder, got back %A" x
+                x
     (*
         Okay, let's think through this scenario from the perspective of the behavior which is USING the child behavior.
 
