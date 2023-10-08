@@ -8,6 +8,8 @@ type QueryRequest<'ctx, 'result> = QueryRequest of ('ctx -> 'result)
 let run logic (feedback, ctx) = logic(feedback, ctx)
 
 type BehaviorBuilder() =
+    member this.Delay f = f
+    member this.Run b = fun (feedback, ctx) -> b()(feedback, ctx)
     member this.Return (x: 't) : Behavior<_,_,_,_> = fun (feedback, ctx) -> Finished x
     member this.ReturnFrom (x: Behavior<_,_,_,_>) = x
     // member this.Bind(b, f) = bind b f
