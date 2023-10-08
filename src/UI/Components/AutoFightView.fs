@@ -217,10 +217,11 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
 let ViewCombat (setup, combatLog: CombatLog) dispatch =
     let showRolls, setShowRolls = React.useState true
     // we want to reinitialize combat if and only if combatLog changes, instead of never reinitializing it. I.e. when we run a new fight we should wipe the old display and start over
-    let combat, setCombat = React.useStateWithDependencies (fun () -> combatLog |> List.last |> snd) combatLog
+    let combatLogEntry, setCombatLogEntry = React.useStateWithDependencies (fun () -> combatLog |> List.last) combatLog
+    let logEntry, combat = combatLogEntry
     let currentIndex, setCurrentIndex = React.useState 0
     class' "combat" Html.div [
-        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, combat.geo) dispatch]
+        class' "visuals" Html.div [ArenaView.Actual (combat.combatants.Values |> List.ofSeq, logEntry, combat.geo) dispatch]
         class' "statusTable" Html.div [
             Html.table [
                 Html.thead [
@@ -264,7 +265,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             let setIndex gotoNearest newIndex _ =
                 if newIndex >= 0 && newIndex < combatLog.Length then
                     setCurrentIndex newIndex
-                    setCombat (combatLog.[newIndex] |> snd)
+                    setCombatLogEntry (combatLog.[newIndex])
                     // set focus to the newly-selected row
                     let log = (Browser.Dom.document.getElementsByClassName "logEntries")[0]
                     let entry =
@@ -302,8 +303,8 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             ]
         class' "logEntries" Html.div [
             for (ix, (msg, state)) in combatLog |> List.mapi Tuple2.create do
-                let header (txt:string) = Html.h3 [prop.text txt; prop.onClick (fun _ -> setCurrentIndex ix; setCombat state); if ix = currentIndex then prop.className "selected"]
-                let div (children: ReactElement list) = Html.div [prop.children children; prop.onClick (fun _ -> setCurrentIndex ix; setCombat state); if ix = currentIndex then prop.className "selected"]
+                let header (txt:string) = Html.h3 [prop.text txt; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
+                let div (children: ReactElement list) = Html.div [prop.children children; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
                 match msg with
                 | None -> header "Combat begins"
                 | Some msg ->

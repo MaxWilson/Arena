@@ -11,6 +11,7 @@ open UI.Components.Arena
 
 [<AutoOpen>]
 module private Impl =
+    open Fable.Core.JsInterop
     type RenderHelper(pixelWidth, pixelHeight) =
         let _scaleX, _scaleY = (float pixelWidth / 40.<yards>), (float pixelHeight / 40.<yards>)
         // hmmm, I guess we want to use the same scale for both X and Y don't we? Take the minimum and just let the other space go unused.
@@ -91,6 +92,14 @@ module private Impl =
                     Line.opacity (if i % 5 = 0 then 0.3 else 0.1)
                     ]
             ]
+    // tween animation--modify just one node independently of others
+    let simpleMoveAnimation (r:RenderHelper) ((x,y): Coords) (durationSeconds: float) (onFinish: unit -> unit) (node: KonvaNode)  =
+         node.``to`` (createObj [
+            "x" ==> r.scaleX x
+            "y" ==> r.scaleY y
+            "duration" ==> durationSeconds
+            "onFinish" ==> onFinish
+            ])
 
 [<ReactComponent>]
 let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
@@ -147,14 +156,14 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
 
 
 [<ReactComponent>]
-let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
+let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
     let shownNames, setShownNames = React.useState Map.empty
     let hover, setHover = React.useState None
     let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
     let stageRef = React.useRef None
-    let animated = React.useRef Map.empty
+    let nodeRefs = React.useRef Map.empty
     let stageProps (r: RenderHelper) = [
-        Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r) :> IStageProperty
+        Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r)
         let inline nearest (x, y) =
             let x, y = r.unscaleX x |> Ops.round, r.unscaleY y |> Ops.round
             match nearestNeighborCache |> Map.tryFind (x, y) with
@@ -185,6 +194,17 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
         Stage.onTouchMove showClosestMonster
         Stage.onMouseLeave (fun _ -> setHover None)
         Stage.onTouchEnd (fun _ -> setHover None)
+
+        // maybe we shouldn't be doing this inside of stageProps since we only want the side effect... but we need access to the renderHelper for scaling,
+        // and since stageProps will always run it doesn't really hurt anything. Maybe someday we'll refactor display to take a separate hooks() argument which
+        // runs separately before evaluating stageProps but for now it doesn't really matter.
+        React.useLayoutEffect ((fun _ ->
+            match logEntry with
+            | Some (Logged.MoveTo(id, dest, _, _)) ->
+                nodeRefs.current[id] |> simpleMoveAnimation r dest 0.5 (fun _ -> printfn "Animation complete")
+                printfn $"animating = {id} move to {dest} on {nodeRefs.current[id]}"
+            | _ -> ()
+            ), [| box logEntry |])
         ]
     display (320, 320) stageProps <| fun r -> [
         Layer.createNamed "Background" [
@@ -209,6 +229,13 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                         Group.y (r.scaleY y)
                         Group.key (toString c.Id)
                         Group.onClick (fun e -> shownNames |> Map.change c.Id (function Some () -> None | None -> Some ()) |> setShownNames)
+                        Group.ref (fun node ->
+                            let current = nodeRefs.current
+                            match current |> Map.tryFind c.Id with
+                            | Some existingNode when obj.Equals(node, existingNode) = false ->
+                                nodeRefs.current <- current |> Map.add c.Id node
+                            | _ -> ()
+                            )
                         Group.children [
                             circle [
                                 Circle.radius (r.scaleX 0.5<yards>)
@@ -402,7 +429,7 @@ let Arena0 (init, history': Msg list) =
                         | Transitioning(Tween { id = id; from = (x,y) }) when id = creature.id ->
                             (Group.x x: IGroupProperty)
                             Group.y y
-                            Group.ref (fun node -> movingObject.current <- Some node)
+                            Group.ref (fun node -> movingObject.current <- Some (unbox node)) // unbox is a kludge but we don't plan to keep this code anyway
                         | _ ->
                             Group.x creature.x
                             Group.y creature.y

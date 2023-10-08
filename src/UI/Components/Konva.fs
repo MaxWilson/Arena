@@ -56,6 +56,7 @@ type KonvaNode = // the actual underlying Konva node which the React layers (bel
     abstract y : unit -> float
     abstract y : float -> unit
     abstract getStage: unit -> StageNode
+    abstract ``to``: obj -> unit
 and StageNode =
     inherit KonvaNode
     abstract container: unit -> Container
@@ -119,7 +120,7 @@ type Shape =
     static member inline onTouchMove (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onTouchMove" f
     static member inline onMouseEnter (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseEnter" f
     static member inline onMouseLeave (f: ({| target: KonvaNode |} -> 'b)) = mkShapeAttr "onMouseLeave" f
-    static member inline ref handle = mkShapeAttr "ref" handle
+    static member inline ref (handle: KonvaNode -> 'b) = mkShapeAttr "ref" handle
     static member inline offsetX (v: float) = mkShapeAttr "offsetX" v
     static member inline offsetY (v: float) = mkShapeAttr "offsetY" v
 
@@ -180,6 +181,7 @@ type Stage =
     static member inline children (children: _ list) = Stage.children (children |> Array.ofList)
     static member inline create (props: IStageProperty list) = stage (props |> Array.ofList)
     static member inline create (props, children) = Stage.create ((Stage.children (children |> Array.ofList))::props)
+    static member inline ref (handle: StageNode -> 'b) = mkStageAttr "ref" handle
 
 type KonvaNode0 =
     [<Emit "$0.to($1)">]
