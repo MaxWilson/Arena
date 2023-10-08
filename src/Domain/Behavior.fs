@@ -34,6 +34,9 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
 
 let query(f: ActionContext -> _) = QueryRequest f
 let attack details = ReturnAction (Attack details)
+
+let nullBehavior = (behavior { return () })
+
 // move toward is a finite behavior, stops when you get within 1 yard of the target
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     let! geo, dist = query(fun ctx -> ctx.geo, ctx.geo.DistanceBetween(ctx.me, targetId))
@@ -45,30 +48,30 @@ let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     }
 
 let justAttack : ActionBehavior = behavior {
-    let rec loop targetId = behavior {
-        let! target = query(fun ctx ->
+    let rec loop targetId keepMoving = behavior {
+        let! target, changed = query(fun ctx ->
             match targetId with
             | Some targetId ->
                 let target = ctx.combat.combatants[targetId]
-                if target.isnt [Unconscious; Dead] then Some target
-                else tryFindTarget ctx.combat ctx.me_
-            | None -> tryFindTarget ctx.combat ctx.me_
+                if target.isnt [Unconscious; Dead] then Some target, false
+                else tryFindTarget ctx.combat ctx.me_, true
+            | None -> tryFindTarget ctx.combat ctx.me_, true
             )
         match target with
         | None -> return ()
         | Some target ->
-            match! RunChildRequest (moveToward target.Id) with
-            | Finished() ->
+            let! ctx = query id
+            match! run (if changed then moveToward target.Id else keepMoving) ((), ctx) with
+            | Ready() ->
                 let! rs = query(fun ctx ->
                     match ctx.me_ with Resourcing.ConsumeRapidStrike c when c.stats.UseRapidStrike -> true | _ -> false
                     )
                 let! feedback, ctx = attack({ AttackDetails.create(target.Id) with rapidStrike = rs })
-                return! loop (Some target.Id)
-            | AwaitingAction(action, followup) ->
-                let! feedback, ctx = ReturnAction action
-                return! loop (Some target.Id)
+                return! loop (Some target.Id) (moveToward target.Id) // give it moveToward because the target might move again
+            | Resume(keepMoving) ->
+                return! loop (Some target.Id) keepMoving
         }
-    return! loop None
+    return! loop None nullBehavior
     }
 
 // note: we're not doing nowarn 40 here because throwing a notImpl exception is kind of weird, and if justFlee were a recursive object instead
@@ -81,16 +84,16 @@ let rec justFlee() : ActionBehavior = behavior {
 
 let cowardly bhv flee : ActionBehavior = behavior {
     let rec loop bhv flee = behavior {
-        let! brave = query(fun ctx -> let me = ctx.me_ in me.CurrentHP_ > me.stats.HP_ / 3)
-
-        let! result = RunChildRequest (if brave then bhv else flee)
+        let! ctx = query id
+        let brave = let me = ctx.me_ in me.CurrentHP_ > me.stats.HP_ / 3
+        let! result = (if brave then bhv else flee)((), ctx)
         match result with
-        | Finished result -> return result
-        | AwaitingAction(action, followup) ->
+        | Resume followup ->
             // update whichever behavior we used
             let bhv, flee = if brave then followup, flee else bhv, followup
             return! loop bhv flee // we track state for both bhv and flee separately,
             // so we can un-flee if we get healed. Otherwise we would just return! flee and permanently go into flee mode.
+        | Ready () -> return ()
         }
     return! loop bhv flee
     }

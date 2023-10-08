@@ -5,6 +5,7 @@ open Domain
 open Domain.Random
 open Domain.Behavior
 open Domain.CombatRules
+open Domain.Geo
 let verify = Swensen.Unquote.Assertions.test
 
 #nowarn "40" // we're not doing anything weird in the behavior ctors like calling arguments that are functions, or anything like that, so the warning is acknowledged but not a problem.
@@ -67,8 +68,8 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
             | AwaitingAction(action, nextBehavior) ->
                 BobsBhv <- nextBehavior
                 // we don't actually DO the action in this test but we verify that it's an attack on the other Bob
-                verify <@ action = expected @>
-        doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) (combatAt (0.<yards>, 0.3<yards>)) // when we're in reach we should just attack
-        doCheckActionFor (Move(Person (2, "Bob"))) (combatAt (yards 0., yards 2.)) // the first time we should get a move
+                verify <@ expected = action @>
+        doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) (combatAt (0.<yards>, 1.<yards>)) // when we're in reach we should just attack
+        doCheckActionFor (Move(Person (2, "Bob"))) (combatAt (yards 5., yards 5.)) // the first time we should get a move
         doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) ((combatAt (yards 0., yards 2.)) |> CombatAtom.updateCombat (MoveTo((2, "Bob"), (yards 0., yards 1.), 0, ""))) // but when we're in reach we should just attack
     ]
