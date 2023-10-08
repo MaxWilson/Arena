@@ -77,6 +77,7 @@ let justAttack : ActionBehavior = behavior {
             | AwaitingAction(action, followup) ->
                 printfn "Need to move, let's do that and then continue..."
                 let! feedback, ctx = ReturnAction action
+                printfn "Finished the move, continuing..."
                 return! loop (Some target.Id)
         }
     printfn "About to enter justAttack loop for the first time"
