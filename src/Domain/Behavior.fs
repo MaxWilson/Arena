@@ -18,7 +18,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
         // then targets that are prone but not yet at -HP,
         // then targets that are below 1/3 HP but not yet at 0 HP,
         // then targets at or below 0 HP
-        // then anyone still alive (ordered by statblock name and number because why not, and it makes readouts more predictable)
+        // then anyone still alive (ordered by distance)
         |> Seq.sortBy(fun c ->
             ((c.is Stunned)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
@@ -26,7 +26,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
             c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
-            c.number)
+            combat.geo.DistanceBetween(attacker.Id, c.Id))
     potentialTargets
 
 let tryFindTarget (combat: Combat) (attacker: Combatant) =

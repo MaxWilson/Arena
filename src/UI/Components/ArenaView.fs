@@ -211,14 +211,12 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                                 Circle.radius (r.scaleX 0.5<yards>)
                                 Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
                                 Circle.key "outline"
-                                // Circle.onMouseOver (fun e ->
-                                //     e.target.getStage().container().style.cursor <- CursorType.Pointer
-                                //     setHover (Some c.Id))
-                                // Circle.onMouseLeave (fun e ->
-                                //     if hover = (Some c.Id) then
-                                //         e.target.getStage().container().style.cursor <- CursorType.Default
-                                //         setHover None
-                                //     )
+                                Circle.onMouseOver (fun e ->
+                                    e.target.getStage().container().style.cursor <- CursorType.Pointer
+                                    )
+                                Circle.onMouseLeave (fun e ->
+                                    e.target.getStage().container().style.cursor <- CursorType.Default
+                                    )
                                 if hover = Some c.Id then
                                     Circle.stroke Color.Black
                                     Circle.strokeWidth 2
