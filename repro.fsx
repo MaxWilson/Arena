@@ -33,19 +33,18 @@ let justAttack : ActionBehavior = behavior {
             return ()
         | Some target ->
             printfn "Still have a target"
-            let! response = RunChildRequest (moveToward target.Id)
+            let! ctx = query id
+            let! response = (moveToward target.Id)((), ctx)
             match response with
-            | Finished() ->
+            | Ready() ->
                 printfn "Didn't need to move, continuing"
                 let! rs = query(fun ctx ->
                     match ctx.me_ with Resourcing.ConsumeRapidStrike c when c.stats.UseRapidStrike -> true | _ -> false
                     )
                 let! feedback, ctx = attack({ AttackDetails.create(target.Id) with rapidStrike = rs })
                 return! loop (Some target.Id)
-            | AwaitingAction(action, followup) ->
-                printfn "Need to move, let's do that and then continue..."
-                let! feedback, ctx = ReturnAction action
-                printfn "Finished the move, continuing..."
+            | Resume(keepMoving) ->
+                printfn "Needed to move, but not done moving yet..." // we could use keepMoving but why bother? It's not a multi-step kind of behavior.
                 return! loop (Some target.Id)
         }
     printfn "About to enter justAttack loop for the first time"
@@ -69,9 +68,33 @@ run bhv ((), toCtx (combatAt (yards 0., yards 1.)))
 let (AwaitingAction(action, bhv)) = run bhv ((), toCtx (combatAt (yards 0., yards 1.)))
 action // this should be Attack but is Move the first time we run it! Repros the issue!
 
-let bhv : ActionBehavior = behavior {
-    printfn "Starting bhv" // should not print immediately
+let behavior = BehaviorBuilder()
+
+
+
+let walk : ActionBehavior = behavior {
+    printfn "***Starting walk" // should not print immediately
+    let! feedback, ctx = ReturnAction(Move(Place (yards 0., yards 0.)))
     return ()
     }
-let b = behavior in
-    b.Run(b.Delay(fun () -> b.Return ()))
+let rec loop: ActionBehavior = behavior {
+    printfn "***Running loop"
+    let rec innerLoop walk = behavior {
+        let! ctx = query(id)
+        let! result = run walk ((), ctx)
+        match result with
+        | Resume(walking) ->
+            // if we get here then walking is still ongoing, but how do I actually resume it?
+            return! innerLoop walking
+        | Ready () -> return! loop // could do something else instead
+        }
+    return! innerLoop walk
+    }
+let (AwaitingAction(action, b1)) = run loop ((), toCtx (combatAt (yards 0., yards 1.)))
+let (AwaitingAction(action, b2)) = run b1 ((), toCtx (combatAt (yards 0., yards 1.)))
+let (AwaitingAction(action, b3)) = run b2 ((), toCtx (combatAt (yards 0., yards 1.)))
+
+let (AwaitingAction(action, b1)) = run walk ((), toCtx (combatAt (yards 0., yards 1.)))
+let (AwaitingAction(action, b2)) = run b1 ((), toCtx (combatAt (yards 0., yards 1.)))
+let (AwaitingAction(action, b3)) = run b2 ((), toCtx (combatAt (yards 0., yards 1.)))
+2+2

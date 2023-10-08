@@ -70,7 +70,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
                 // we don't actually DO the action in this test but we verify that it's an attack on the other Bob
                 verify <@ action = expected @>
         doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) (combatAt (0.<yards>, 0.3<yards>)) // when we're in reach we should just attack
-        doCheckActionFor (Move(Person (2, "Bob"))) (combatAt (yards 0., yards 2.)) // the first time we should get a move
+        doCheckActionFor (Move(Person (2, "Bob"))) (combatAt (yards 0., yards 3.)) // the first time we should get a move
         let c= ((combatAt (yards 0., yards 2.)) |> CombatAtom.updateCombat (MoveTo((2, "Bob"), (yards 0., yards 1.), 0, "")))
         verify <@ c.geo.Find(2, "Bob") = (yards 0., yards 1.) @>
         doCheckActionFor (Attack (AttackDetails.create(2, "Bob"))) ((combatAt (yards 0., yards 2.)) |> CombatAtom.updateCombat (MoveTo((2, "Bob"), (yards 0., yards 1.), 0, ""))) // but when we're in reach we should just attack
