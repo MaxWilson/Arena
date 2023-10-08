@@ -212,8 +212,6 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                             circle [
                                 Circle.radius (r.scaleX 0.5<yards>)
                                 Circle.fill (if c.team = 1 then Color.Blue else Color.Purple)
-                                if c.isAny [Dead; Unconscious] then
-                                    Circle.opacity 0.2
                                 Circle.key "outline"
                                 Circle.onMouseOver (fun e ->
                                     e.target.getStage().container().style.cursor <- CursorType.Pointer
@@ -223,10 +221,12 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                                     )
                                 if hover = Some c.Id then
                                     Circle.stroke Color.Black
-                                    Circle.strokeWidth 2
+                                    Circle.strokeWidth 3
                                 elif shownNames |> Map.containsKey c.Id then
                                     Circle.stroke Color.Black
-                                    Circle.strokeWidth 1
+                                    Circle.strokeWidth 2
+                                elif c.isAny [Dead; Unconscious] then
+                                    Circle.opacity 0.2
                                 ]
                             if hover = Some c.Id || shownNames |> Map.containsKey c.Id then
                                 let label = if c.is Dead then $"Dead {c.personalName}" elif c.is Unconscious then $"Unconscious {c.personalName}" else c.personalName
@@ -236,7 +236,7 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                                     Rect.width textWidth
                                     Rect.offsetX (textWidth / 2 |> float)
                                     Rect.height 20
-                                    Rect.offsetY 22.
+                                    Rect.offsetY 32.
                                     Rect.fill Color.White
                                     Rect.stroke Color.Black
                                     Rect.strokeWidth 2
@@ -249,7 +249,7 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
                                     Text.width textWidth
                                     Text.offsetX (textWidth / 2 |> float)
                                     Text.height 20
-                                    Text.offsetY 20.
+                                    Text.offsetY 30.
                                     Text.fontSize 18
                                     if hover = Some c.Id then Text.fontStyle "900" // unusually bold
                                     else Text.fontStyle "bold"
