@@ -264,13 +264,13 @@ module ExecuteAction =
             let dist = min (float move * 1.<yards>) (line.Length - yards 1.) |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
             let goalPos = line.Extend dist
             let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves {dist} yards toward {ctx.combat.combatants[p].personalName}")))
+            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves %.1f{dist} yards toward {ctx.combat.combatants[p].personalName}")))
         | AvailableMove(move, me), Place coords ->
             let line = ctx.geo.LineFrom(ctx.geo.Find me.Id, coords)
             let dist = min (float move * 1.<yards>) line.Length |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
             let goalPos = line.Extend dist
             let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves {dist} yards")))
+            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves %.1f{dist} yards")))
         | _ -> shouldntHappen "We should have already checked move"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
