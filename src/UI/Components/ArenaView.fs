@@ -152,6 +152,7 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
     let hover, setHover = React.useState None
     let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
     let stageRef = React.useRef None
+    let animated = React.useRef Map.empty
     let stageProps (r: RenderHelper) = [
         Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r) :> IStageProperty
         let inline nearest (x, y) =
