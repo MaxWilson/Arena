@@ -20,6 +20,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
         // then targets at or below 0 HP
         // then anyone still alive (ordered by distance)
         |> Seq.sortBy(fun c ->
+            combat.geo.DistanceBetween(attacker.Id, c.Id) |> Ops.round, // prefer close targets the most
             ((c.is Stunned)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             ((c.is Prone)
