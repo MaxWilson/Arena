@@ -182,6 +182,8 @@ let Actual (combatants: Combatant list, geo: Geo2d) dispatch =
         Stage.onMouseMove showClosestMonster
         Stage.onTouchStart showClosestMonster
         Stage.onTouchMove showClosestMonster
+        Stage.onMouseLeave (fun _ -> setHover None)
+        Stage.onTouchEnd (fun _ -> setHover None)
         ]
     display (320, 320) stageProps <| fun r -> [
         Layer.createNamed "Background" [
