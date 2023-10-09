@@ -303,6 +303,7 @@ module Data =
 
     type Geo2d = {
         lookup: Map<CombatantId, Coords>
+        occupancy: Map<(int * int), CombatantId>
         }
     type Combat = {
         combatants: Map<CombatantId, Combatant>

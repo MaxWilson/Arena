@@ -10,6 +10,13 @@ let shouldFail = Swensen.Unquote.Assertions.raises
 
 [<Tests>]
 let Tests = testLabel "Unit" <| testList "Geo" [
+    testCase "Spot-check coords to index conversions" <| fun () ->
+        verify <@ Geo.indexOf (coords(0., 0.)) = (0, 0) @>
+        verify <@ Geo.indexOf (coords(1., 0.)) = (2, 0) @>
+        verify <@ Geo.indexOf (coords(1., 3.5)) = (2, 7) @>
+        verify <@ Geo.indexOf (coords(-1., -1)) = (-2, -2) @>
+        verify <@ Geo.indexOf (coords(0, -1)) = (0, -2) @>
+        verify <@ Geo.indexOf (coords(0, -0.5)) = (0, -1) @>
     testCase "Spot-check Geo lines" <| fun () ->
         let g = Geo.ofList [
             (1, "Bob"), (0.<yards>, 0.<yards>)
@@ -18,7 +25,7 @@ let Tests = testLabel "Unit" <| testList "Geo" [
             (4, "Bob"), (9.<yards>, 9.<yards>)
             ]
         let l = g.LineFrom (g.Find (2, "Bob"), g.Find (3, "Bob"))
-        verify <@ l.Length = (sqrt (12*12 + 15*15 |> float) * 1.<yards>) @>
+        verify <@ l.Length = (sqrt (4.5*4.5 + 15.*15.) * 1.<yards>) @> // NOT Euclidean distance! In hex distance half of the 15 goes towards reducing the 12
         let nearBob3 = l.Extend (l.Length - yards 1.)
         verify <@ g.WithinDistance (nearBob3, g.Find(3, "Bob"), yards 1.0) @>
         ()

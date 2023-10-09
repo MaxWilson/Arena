@@ -27,7 +27,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
             c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
-            combat.geo.EuclideanSquared(attacker.Id, c.Id) |> Ops.round, // all else being equal, pick closer targets
+            combat.geo.HexDistanceSquared(attacker.Id, c.Id) |> Ops.round, // all else being equal, pick closer targets
             c.number)
     potentialTargets
 
