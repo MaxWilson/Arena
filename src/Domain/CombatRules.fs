@@ -53,7 +53,7 @@ module CombatAtom =
                     { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
         | Info (id, _, _) -> model
         | NewRound _ -> model
-        | MoveTo (id, dest, mv, _) ->
+        | MoveTo (id, _, dest, mv, _) ->
             let place id dest model = { model with geo = model.geo |> Geo.place id dest }
             (consumeMovement mv id model) |> place id dest
     let update msg model =
@@ -264,13 +264,13 @@ module ExecuteAction =
             let dist = min (float move * 1.<yards>) (line.Length - yards 1.) |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
             let goalPos = line.Extend dist
             let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves %.1f{dist} yards toward {ctx.combat.combatants[p].personalName}")))
+            cqrsExecute (Logged(MoveTo(me.Id, line.Origin, goalPos, cost, $"moves %.1f{dist} yards toward {ctx.combat.combatants[p].personalName}")))
         | AvailableMove(move, me), Place coords ->
             let line = ctx.geo.LineFrom(ctx.geo.Find me.Id, coords)
             let dist = min (float move * 1.<yards>) line.Length |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
             let goalPos = line.Extend dist
             let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, goalPos, cost, $"moves %.1f{dist} yards")))
+            cqrsExecute (Logged(MoveTo(me.Id, line.Origin, goalPos, cost, $"moves %.1f{dist} yards")))
         | _ -> shouldntHappen "We should have already checked move"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =

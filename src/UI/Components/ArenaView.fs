@@ -93,8 +93,8 @@ module private Impl =
                     ]
             ]
     // tween animation--modify just one node independently of others
-    let simpleMoveAnimation (r:RenderHelper) ((x,y): Coords) (durationSeconds: float) (onFinish: unit -> unit) (node: KonvaNode)  =
-         node.``to`` (createObj [
+    let inline simpleMoveAnimation (r:RenderHelper) ((x,y): Coords) (durationSeconds: float) (onFinish: unit -> unit) (node: KonvaNode)  =
+        node.``to`` (createObj [
             "x" ==> r.scaleX x
             "y" ==> r.scaleY y
             "duration" ==> durationSeconds
@@ -200,9 +200,11 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
         // runs separately before evaluating stageProps but for now it doesn't really matter.
         React.useLayoutEffect ((fun _ ->
             match logEntry with
-            | Some (Logged.MoveTo(id, dest, _, _)) ->
-                nodeRefs.current[id] |> simpleMoveAnimation r dest 0.5 (fun _ -> printfn "Animation complete")
-                printfn $"animating = {id} move to {dest} on {nodeRefs.current[id]}"
+            | Some (Logged.MoveTo(id, origin, dest, _, _)) ->
+                match nodeRefs.current |> Map.tryFind id with
+                | Some node ->
+                    node |> simpleMoveAnimation r dest 0.5 ignore
+                | _ -> ()
             | _ -> ()
             ), [| box logEntry |])
         ]
@@ -224,7 +226,10 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
                 // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
                 for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
                     Group.create ([
-                        let x,y = geo.Find(c.Id)
+                        let x,y =
+                            match logEntry with
+                            | Some (MoveTo(id, origin, _, _, _)) when id = c.Id -> origin // DON'T use the final position because we want to animate movement towards it
+                            | _ -> geo.Find(c.Id)
                         Group.x (r.scaleX x)
                         Group.y (r.scaleY y)
                         Group.key (toString c.Id)
@@ -234,7 +239,9 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
                             match current |> Map.tryFind c.Id with
                             | Some existingNode when obj.Equals(node, existingNode) = false ->
                                 nodeRefs.current <- current |> Map.add c.Id node
-                            | _ -> ()
+                            | None ->
+                                nodeRefs.current <- current |> Map.add c.Id node
+                            | Some _ -> ()
                             )
                         Group.children [
                             circle [

@@ -356,7 +356,7 @@ module Data =
             | Unstun of CombatantId * string
             | StandUp of CombatantId * string
             | Info of CombatantId * msg: string * rollInfo: string
-            | MoveTo of CombatantId * Coords * movementPointsSpent: int * describe:string
+            | MoveTo of CombatantId * start:Coords * dest:Coords * movementPointsSpent: int * describe:string
             | NewRound of int
         type HouseKeeping =
             | NewTurn of CombatantId
