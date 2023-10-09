@@ -7,11 +7,12 @@ let place (combatantId: CombatantId) coords (geo:Geo2d) =
     { lookup = geo.lookup |> Map.add combatantId coords }
 
 module private Impl =
-    let distSquared ((lx, ly): Coords) (rx, ry) =
+    let distSquared ((lx, ly): Coords) ((rx, ry): Coords) =
         let dx = lx - rx
         let dy = ly - ry
         dx * dx + dy * dy
     let dist lhs rhs = distSquared lhs rhs |> sqrt
+    let distanceLessThan lhs rhs distance = dist lhs rhs <= distance + 0.1<yards>
 open Impl
 
 type Line(origin, dest) =
@@ -25,15 +26,20 @@ type Line(origin, dest) =
         let (dx, dy) = (dx / length, dy / length)
         (origX + dx * distance, origY + dy * distance)
 
+// Actual Euclidean distances should be used only for approximation purposes (UI display and target prioritization), not for actual game rules,
+// because grids simplify issues like finding where to stand and who's in reach. Insisting on Euclidean precision for things like how many orcs
+// can surround a knight would be onerous.
 type Geo2d with
     member this.Find id = this.lookup[id]
-    member this.DistanceBetween(lhsPos, rhsPos) = dist lhsPos rhsPos
-    member this.DistanceBetween(lhsId, rhsId) = dist (this.Find lhsId) (this.Find rhsId)
-    member this.DistanceBetween(lhsId, rhsPos) = dist (this.Find lhsId) rhsPos
-    member this.DistanceBetween(lhsPos, rhsId) = dist lhsPos (this.Find rhsId)
-    member this.DistanceSquared(lhsPos, rhsPos) = distSquared lhsPos rhsPos
-    member this.DistanceSquared(lhsId, rhsId) = distSquared (this.Find lhsId) (this.Find rhsId)
-    member this.DistanceSquared(lhsId, rhsPos) = distSquared (this.Find lhsId) rhsPos
-    member this.DistanceSquared(lhsPos, rhsId) = distSquared lhsPos (this.Find rhsId)
+    member this.WithinDistance(lhsPos, rhsPos, distance) = distanceLessThan lhsPos rhsPos distance
+    member this.WithinDistance(lhsId, rhsId, distance) = distanceLessThan (this.Find lhsId) (this.Find rhsId) distance
+    member this.EuclideanSquared(lhsPos, rhsPos) = distSquared lhsPos rhsPos
+    member this.EuclideanSquared(lhsId, rhsId) = distSquared (this.Find lhsId) (this.Find rhsId)
+    member this.EuclideanSquared(lhsId, rhsPos) = distSquared (this.Find lhsId) rhsPos
+    member this.EuclideanSquared(lhsPos, rhsId) = distSquared lhsPos (this.Find rhsId)
     member this.LineFrom (lhsPos: Coords, rhsPos: Coords) = Line(lhsPos, rhsPos)
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
+    member this.Approach (lhsId, dest: Destination, movementBudget: int) : Coords * float<yards> * int =
+        match dest with
+        | Person _ -> notImpl()
+        | Place _ -> notImpl()

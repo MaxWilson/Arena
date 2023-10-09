@@ -173,7 +173,7 @@ let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logge
                 let distancesSquared =
                     combatants.Values
                     |> List.ofSeq
-                    |> List.map (fun c -> c.Id, geo.DistanceSquared(c.Id, (x,y)))
+                    |> List.map (fun c -> c.Id, geo.EuclideanSquared(c.Id, (x,y)))
                     |> List.sortBy snd
                 match distancesSquared with
                 | [] -> []

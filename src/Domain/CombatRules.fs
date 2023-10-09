@@ -260,19 +260,20 @@ module ExecuteAction =
 
     let doMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
         let startPos = ctx.geo.Find(ctx.me)
-        match ctx.me_, dest with
-        | AvailableMove(move, me), Person p ->
-            let line = ctx.geo.LineFrom(me.Id, p)
-            let dist = min (float move * 1.<yards>) (line.Length - yards 1.) |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
-            let goalPos = line.Extend dist
-            let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, line.Origin, goalPos, cost, $"moves %.1f{dist} yards toward {ctx.combat.combatants[p].personalName}")))
-        | AvailableMove(move, me), Place coords ->
-            let line = ctx.geo.LineFrom(ctx.geo.Find me.Id, coords)
-            let dist = min (float move * 1.<yards>) line.Length |> max 0.<yards> // avoid close combat for now: only move to 1 yards away, not 0
-            let goalPos = line.Extend dist
-            let cost = dist |> Ops.roundUp |> int // TODO: charge extra based on terrain
-            cqrsExecute (Logged(MoveTo(me.Id, line.Origin, goalPos, cost, $"moves %.1f{dist} yards")))
+        match ctx.me_ with
+        | AvailableMove(moveBudget, me) ->
+            let goalPos, euclideanDistance, cost = ctx.geo.Approach(ctx.me, dest, moveBudget)
+            let msg =
+                match dest with
+                | Person p when euclideanDistance > 0.5<yards> ->
+                    $"moves %.1f{euclideanDistance} yards toward {ctx.combat.combatants[p].personalName}"
+                | Person p ->
+                    $"moves a little towards {ctx.combat.combatants[p].personalName}"
+                | Place coords when euclideanDistance > 0.5<yards> ->
+                    $"moves %.1f{euclideanDistance} yards"
+                | Place coords ->
+                    $"moves a little"
+            cqrsExecute (Logged(MoveTo(me.Id, ctx.geo.Find ctx.me, goalPos, cost, msg)))
         | _ -> shouldntHappen "We should have already checked move"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =

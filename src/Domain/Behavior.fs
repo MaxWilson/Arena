@@ -20,14 +20,14 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
         // then targets at or below 0 HP
         // then anyone still alive (ordered by distance)
         |> Seq.sortBy(fun c ->
-            combat.geo.DistanceBetween(attacker.Id, c.Id) |> Ops.round, // prefer close targets the most
+            combat.geo.WithinDistance(attacker.Id, c.Id, 1.<yards>), // prefer targets within reach
             ((c.is Stunned)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             ((c.is Prone)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
             c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
-            combat.geo.DistanceBetween(attacker.Id, c.Id),
+            combat.geo.EuclideanSquared(attacker.Id, c.Id) |> Ops.round, // all else being equal, pick closer targets
             c.number)
     potentialTargets
 
@@ -41,8 +41,8 @@ let nullBehavior = (behavior { return () })
 
 // move toward is a finite behavior, stops when you get within 1 yard of the target
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
-    let! geo, dist = query(fun ctx -> ctx.geo, ctx.geo.DistanceBetween(ctx.me, targetId))
-    if dist <= 1.01<yards> then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
+    let! geo, inReach = query(fun ctx -> ctx.geo, ctx.geo.WithinDistance(ctx.me, targetId, 1.0<yards>))
+    if inReach then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
         return () // done! We're in range, can do something else now.
     else
         let! feedback, ctx = ReturnAction(Move(Person targetId))

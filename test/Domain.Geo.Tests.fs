@@ -20,6 +20,6 @@ let Tests = testLabel "Unit" <| testList "Geo" [
         let l = g.LineFrom (g.Find (2, "Bob"), g.Find (3, "Bob"))
         verify <@ l.Length = (sqrt (12*12 + 15*15 |> float) * 1.<yards>) @>
         let nearBob3 = l.Extend (l.Length - yards 1.)
-        verify <@ g.DistanceBetween (nearBob3, (3, "Bob")) < yards 1.01 @>
+        verify <@ g.WithinDistance (nearBob3, g.Find(3, "Bob"), yards 1.0) @>
         ()
     ]
