@@ -41,5 +41,5 @@ type Geo2d with
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
     member this.Approach (lhsId, dest: Destination, movementBudget: int) : Coords * float<yards> * int =
         match dest with
-        | Person _ -> notImpl()
-        | Place _ -> notImpl()
+        | Person _ -> notImpl "Approach person"
+        | Place _ -> notImpl "Approach place"
