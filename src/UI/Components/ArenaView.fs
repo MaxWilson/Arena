@@ -156,12 +156,13 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
 
 
 [<ReactComponent>]
-let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
+let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
     let shownNames, setShownNames = React.useState Map.empty
     let hover, setHover = React.useState None
     let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
     let stageRef = React.useRef None
     let nodeRefs = React.useRef Map.empty
+    let priorAnimation = React.useRef None
     let stageProps (r: RenderHelper) = [
         Stage.ref (fun (r: StageNode) -> stageRef.current <- Some r)
         let inline nearest (x, y) =
@@ -170,8 +171,9 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
             | Some ids -> ids
             | None ->
                 let distancesSquared =
-                    combatants
-                    |> List.map (fun c -> let cx, cy = geo.Find(c.Id) in c.Id, (cx - x) * (cx - x) + (cy - y) * (cy - y)) // don't bother to sqrt because we are just sorting
+                    combatants.Values
+                    |> List.ofSeq
+                    |> List.map (fun c -> c.Id, geo.DistanceSquared(c.Id, (x,y)))
                     |> List.sortBy snd
                 match distancesSquared with
                 | [] -> []
@@ -199,13 +201,26 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
         // and since stageProps will always run it doesn't really hurt anything. Maybe someday we'll refactor display to take a separate hooks() argument which
         // runs separately before evaluating stageProps but for now it doesn't really matter.
         React.useLayoutEffect ((fun _ ->
+            let cancelPriorAnimation currentId = // don't cancel an animation that's still current
+                match priorAnimation.current with
+                | Some id as prior when currentId <> prior ->
+                    let node: KonvaNode = nodeRefs.current[id]
+                    // cancel the animation by setting x and y explicitly
+                    let x, y = geo.Find id
+                    node.x(r.scaleX x)
+                    node.y(r.scaleY y)
+                | _ -> ()
+                priorAnimation.current <- currentId
+
             match logEntry with
             | Some (Logged.MoveTo(id, origin, dest, _, _)) ->
+                cancelPriorAnimation (Some id)
                 match nodeRefs.current |> Map.tryFind id with
                 | Some node ->
-                    node |> simpleMoveAnimation r dest 0.5 ignore
+                    node |> simpleMoveAnimation r dest 0.2 ignore
                 | _ -> ()
-            | _ -> ()
+                // we don't want prior animations to stay on the screen if we go back in time, so we need to reset x and y. TODO: find a way to cancel the prior animation by killing the tween BEFORE we reset x and y.
+            | _ -> cancelPriorAnimation None
             ), [| box logEntry |])
         ]
     display (320, 320) stageProps <| fun r -> [
@@ -224,7 +239,7 @@ let Actual (combatants: Combatant list, logEntry: CombatAtoms.Logged option, geo
             Layer.key "Combatants" :> ILayerProperty
             Layer.children [
                 // Konva react doesnt' really have a concept of z-index, so make sure that anything hovered will be drawn last so it's on top.
-                for c in combatants |> List.sortBy (fun c -> hover = Some c.Id) do
+                for c in combatants.Values |> Seq.sortBy (fun c -> hover = Some c.Id) do
                     Group.create ([
                         let x,y =
                             match logEntry with

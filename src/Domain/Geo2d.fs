@@ -31,5 +31,9 @@ type Geo2d with
     member this.DistanceBetween(lhsId, rhsId) = dist (this.Find lhsId) (this.Find rhsId)
     member this.DistanceBetween(lhsId, rhsPos) = dist (this.Find lhsId) rhsPos
     member this.DistanceBetween(lhsPos, rhsId) = dist lhsPos (this.Find rhsId)
+    member this.DistanceSquared(lhsPos, rhsPos) = distSquared lhsPos rhsPos
+    member this.DistanceSquared(lhsId, rhsId) = distSquared (this.Find lhsId) (this.Find rhsId)
+    member this.DistanceSquared(lhsId, rhsPos) = distSquared (this.Find lhsId) rhsPos
+    member this.DistanceSquared(lhsPos, rhsId) = distSquared lhsPos (this.Find rhsId)
     member this.LineFrom (lhsPos: Coords, rhsPos: Coords) = Line(lhsPos, rhsPos)
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
