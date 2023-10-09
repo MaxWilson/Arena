@@ -395,7 +395,7 @@ let toCombatants (db: Map<string, Creature>) teamNumber project =
             ]
 
 let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
-    let mutable occupiedCells = Set.empty
+    let mutable geo = Geo.ofList []
     let place (group: GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, radius_ group
         let gen (radius: float<yards>) =
@@ -406,20 +406,19 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
             x, y
         let rec findEmptyCoords failureCount radius candidate =
             let x,y = candidate
-            if occupiedCells.Contains (int x, int y) then
+            match Geo.tryPlace combatant.Id (x, y) geo with
+            | Ok g ->
+                geo <- g
+            | Error _ ->
                 if failureCount > 10 then findEmptyCoords 0 (radius + 1.<yards>) (gen radius) // maybe it's full; widen the radius so we don't get stuck in an infinite loop
                 else findEmptyCoords (failureCount+1) radius (gen radius)
-            else
-                occupiedCells <- occupiedCells.Add (int x, int y)
-                candidate
         combatant, findEmptyCoords 0 radius (gen radius)
     let setup = (team1 |> (toCombatants db 1 place)) @ (team2 |> (toCombatants db 2 place))
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
-    let positions = setup |> List.map (fun (c, coords) -> c.Id, coords) |> Geo.ofList
     let behaviors = setup |> List.map (fun (c, _) -> c.Id, justAttack) |> Map.ofList
     {   combat =
             {   combatants = combatants
-                geo = positions
+                geo = geo
             }
         behaviors = behaviors
         }

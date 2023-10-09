@@ -114,7 +114,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
                 create "Badly Hurt Guy" 13 []
                 create "Dying Guy" 22 [Unconscious]
                 ]
-            |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; geo = Geo.ofList [for c in guys -> c.Id, coords (0., 0.)] }
+            |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; geo = Geo.ofList [for ix, c in guys |> List.mapi Tuple2.create -> c.Id, coords (float ix*2., 0.)] }
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
                     = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Stunned Dying Guy"; "Badly Hurt Guy"; ] @>

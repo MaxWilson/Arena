@@ -3,10 +3,12 @@ open Domain.Data
 
 let indexOf ((x,y): Coords) =
     (x * 2.) |> int, (y * 2.) |> int
-let place (combatantId: CombatantId) coords (geo:Geo2d) =
+let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
     let places coords =
         let x, y = indexOf coords
         [ x, y; x + 1, y; x - 1, y; x, y + 1; x, y - 1 ]
+    let mutable error = None
+    let err msg = match error with None -> error <- Some msg | _ -> ()
     let mutable occupants = geo.occupancy
     match geo.lookup |> Map.tryFind combatantId with
     | Some priorCoords ->
@@ -15,17 +17,24 @@ let place (combatantId: CombatantId) coords (geo:Geo2d) =
             | Some prior when prior = combatantId ->
                 occupants <- occupants |> Map.remove point
             | Some v ->
-                shouldntHappen $"{combatantId} is leaving {priorCoords} but occupancy says {v} was there instead!"
+                err $"{combatantId} is leaving {priorCoords} but occupancy says {v} was there instead!"
             | None ->
-                shouldntHappen $"{combatantId} is leaving {priorCoords} but occupancy says it was empty!"
+                err $"{combatantId} is leaving {priorCoords} but occupancy says it was empty!"
     | None -> ()
     for point in places coords do
         match occupants |> Map.tryFind point with
         | None ->
             occupants <- occupants |> Map.add point combatantId
         | Some priorInhabitant ->
-            shouldntHappen $"{point} is already occupied by {priorInhabitant}!"
-    { lookup = geo.lookup |> Map.add combatantId coords; occupancy = occupants }
+            err $"{combatantId} cannot be placed at {point} because it is already occupied by {priorInhabitant}!"
+    match error with
+    | Some err -> Error err
+    | None -> Ok { lookup = geo.lookup |> Map.add combatantId coords; occupancy = occupants }
+
+let place combatantId coords geo =
+    match tryPlace combatantId coords geo with
+    | Ok v -> v
+    | Error e -> shouldntHappen e
 
 let ofList lst =
     lst |> List.fold (fun geo (id, coords) -> place id coords geo) { lookup = Map.empty; occupancy = Map.empty }
