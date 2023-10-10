@@ -9,6 +9,7 @@ module CombatAtom =
     let updateCombatant id (f: Combatant -> Combatant) (model: Combat) =
         { model with combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None) }
     let newTurn (id: CombatantId) = updateCombatant id Combatant.newTurn
+    let endTurn (id: CombatantId) = updateCombatant id Combatant.endTurn
     let updateCombat msg model =
         let illegal() = shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase."
         let updateCombatantWith (|Pattern|_|) id =
@@ -59,6 +60,7 @@ module CombatAtom =
     let update msg model =
         match msg with
         | Unlogged(NewTurn id) -> { model with AugmentedCombat.combat = model.combat |> newTurn id }
+        | Unlogged(EndTurn id) -> { model with AugmentedCombat.combat = model.combat |> endTurn id }
         | Unlogged(SetBehavior (id, None)) -> { model with behaviors = model.behaviors |> Map.remove id }
         | Unlogged(SetBehavior (id, Some bhv)) -> { model with behaviors = model.behaviors |> Map.add id bhv }
         | Logged msg ->
@@ -349,6 +351,9 @@ let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
                 let getCtx() = { combat = cqrs.State.combat; me = attacker.Id }
                 SetBehavior(attacker.Id, ExecuteAction.iterateBehavior msg cqrs.Execute getCtx behavior) |> silentExecute
             else shouldntHappen() "No behaviors set"
+
+            // NOW we clear the shock penalty. Right now that's the only housekeeping that doesn't happen on NewTurn.
+            EndTurn attacker.Id |> silentExecute
 let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) =
     let rec loop counter =
         let survivingTeams =

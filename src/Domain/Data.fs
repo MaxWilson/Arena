@@ -289,12 +289,16 @@ module Data =
                 retreatFrom = None
                 blockUsed = false
                 parriesUsed = 0
-                shockPenalty = 0
                 maneuverBudget = 1 + combatant.stats.AlteredTimeRate_
                 rapidStrikeBudget = None
                 attackBudget = 0
                 movementBudget = 0
                 stepBudget = 0
+                }
+        static member endTurn (combatant: Combatant) =
+            { combatant
+                with
+                shockPenalty = 0
                 }
 
     type Geo2d = {
@@ -360,6 +364,7 @@ module Data =
             | NewRound of int
         type HouseKeeping =
             | NewTurn of CombatantId
+            | EndTurn of CombatantId
             | SetBehavior of CombatantId * ActionBehavior option
         type Atom = Logged of Logged | Unlogged of HouseKeeping
     type AugmentedCombatLog = (Atom option * AugmentedCombat) list

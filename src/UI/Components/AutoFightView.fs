@@ -12,11 +12,11 @@ open UI.Components.AutoFight
 
 [<ReactComponent>]
 let MonsterPicker (db: MonsterDatabase, noMonstersSelectedYet) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =
-    let namePrefix, update = React.useState ""
+    let namePrefix, setNamePrefix = React.useState ""
     Html.div [
-        Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange update]
+        Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange setNamePrefix]
         classP' "newButton" Html.button [prop.text "New"; prop.onClick(thunk1 dispatch (SetPage (Editing "")))]
-        classP' "clearButton" Html.button [prop.text "Clear"; prop.onClick(thunk1 dispatch (Clear side))]
+        classP' "clearButton" Html.button [prop.text "Clear"; prop.onClick(fun _ -> setNamePrefix ""; dispatch (Clear side))]
         monsterDetails
         if namePrefix.Length > 0 || noMonstersSelectedYet then
             let matchingNames = db.catalog.Keys |> Seq.filter (fun name -> name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase)) |> List.ofSeq
