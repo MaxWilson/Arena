@@ -17,8 +17,8 @@ module CombatAtom =
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatantWith ((|ConsumeDefense|_|) defense) id
         let consumeMovement mv id = updateCombatant id (function AvailableMove(moves, c) -> { c with movementBudget = moves - mv } | _ -> illegal())
-        let takeDamage (id: CombatantId) amount conditions =
-            updateCombatant id (fun c ->
+        let takeDamage (id: CombatantId) amount conditions combat =
+            let combat = combat |> updateCombatant id (fun c ->
                 let goingBerserk = conditions |> List.contains Berserk
                 // if going berserk, make sure to remove Stunned from conditions
                 let mods' = (c.statusMods @ conditions) |> List.distinct
@@ -29,6 +29,10 @@ module CombatAtom =
                         else (c.shockPenalty - (amount / (max 1 (c.stats.HP_ / 10)))) |> max -4
                     statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
                     })
+            if conditions |> List.includesAny [Dead; Unconscious] then
+                { combat with geo = combat.geo.RemoveObstruction id } // dead things should no longer block movement
+            else
+                combat
         let consumeAttack rapidStrike = updateCombatantWith (if rapidStrike then (|ConsumeRapidStrike|_|) else (|ConsumeAttack|_|))
         match msg with
         | Hit (ids, rapidStrike, defense, injury, statusImpact, rollDetails) ->

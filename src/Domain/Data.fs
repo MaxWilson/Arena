@@ -280,7 +280,7 @@ module Data =
                 stepBudget = 0
                 }
         member this.is (status: Status) = this.statusMods |> List.exists ((=) status)
-        member this.isAny (statuses: Status list) = this.statusMods |> List.includes statuses
+        member this.isAny (statuses: Status list) = this.statusMods |> List.includesAny statuses
         member this.isnt (status: Status) = this.is status |> not
         member this.isnt (statuses: Status list) = this.isAny statuses |> not
         static member newTurn (combatant: Combatant) =
@@ -303,7 +303,7 @@ module Data =
 
     type Geo2d = {
         lookup: Map<CombatantId, Coords>
-        occupancy: Map<(int * int), CombatantId>
+        obstructions: Map<(int * int), CombatantId>
         }
     type Combat = {
         combatants: Map<CombatantId, Combatant>

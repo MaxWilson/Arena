@@ -42,7 +42,7 @@ EEFFGGHHIIJJ
 is also a hex, 0.5 to the right of 1. Each hex has four places, and each place is a zero-based index
 into the hex grid. 0.0 yards to the right = hex 1 = places 0 and 1 along the x axis.
 
-Observe that places correspond to *areas*, not points.
+Observe that places correspond to *areas* of obstruction, not points.
 
 *)
 
@@ -64,7 +64,7 @@ let placesNear coords hexDistance : Place list =
 let canPlace (combatantId: CombatantId) coords (geo:Geo2d) =
     let newPlaces = placesFor coords
     newPlaces |> List.every (fun place ->
-        match geo.occupancy |> Map.tryFind place with
+        match geo.obstructions |> Map.tryFind place with
         | None -> true
         | Some priorInhabitant when priorInhabitant = combatantId -> true
         | Some prior -> false
@@ -73,7 +73,7 @@ let canPlace (combatantId: CombatantId) coords (geo:Geo2d) =
 let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
     let mutable error = None
     let err msg = match error with None -> error <- Some msg | _ -> ()
-    let mutable occupants = geo.occupancy
+    let mutable occupants = geo.obstructions
     let newPlaces = placesFor coords
     for point in newPlaces do
         if error = None then // we optimize for finding collisions fast, so fail immediately if there's an error
@@ -86,7 +86,7 @@ let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
         match geo.lookup |> Map.tryFind combatantId with
         | Some priorCoords ->
             for point in priorCoords |> placesFor do
-                match geo.occupancy |> Map.tryFind point with
+                match geo.obstructions |> Map.tryFind point with
                 | Some prior when prior = combatantId ->
                     // we want to optimize for finding collisions fast, so we try to add new places before removing old places,
                     // which means we need to be careful not to undo those new additions when removing
@@ -100,7 +100,7 @@ let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
         | None -> ()
     match error with
     | Some err -> Error err
-    | None -> Ok { lookup = geo.lookup |> Map.add combatantId coords; occupancy = occupants }
+    | None -> Ok { lookup = geo.lookup |> Map.add combatantId coords; obstructions = occupants }
 
 let place combatantId coords geo =
     match tryPlace combatantId coords geo with
@@ -108,7 +108,7 @@ let place combatantId coords geo =
     | Error e -> shouldntHappen e
 
 let ofList lst =
-    lst |> List.fold (fun geo (id, coords) -> place id coords geo) { lookup = Map.empty; occupancy = Map.empty }
+    lst |> List.fold (fun geo (id, coords) -> place id coords geo) { lookup = Map.empty; obstructions = Map.empty }
 
 type Line(origin, dest) =
     let length = dist origin dest
@@ -156,5 +156,13 @@ type Geo2d with
             | None ->
                 if radius < movementBudgetInHexes then placeNear coords (radius + 1.<yards>) else None
         placeNear dest (yards 1.)
+
+    // leave combatantId in lookup so it can be displayed, but remove it from obstructions
+    member this.RemoveObstruction combatantId =
+        match this.lookup |> Map.tryFind combatantId with
+        | None -> shouldntHappen "RemoveObstruction found no combatant"
+        | Some priorCoords ->
+            let occ' = priorCoords |> placesFor |> List.fold (fun occupants place -> occupants |> Map.change place (function (Some id') when id' = combatantId -> None | unexpected -> shouldntHappen $"While removing obstruction {combatantId} at {place} found unexpected occupant '{unexpected}'!")) this.obstructions
+            { this with obstructions = occ' }
 
 let tryApproach args (g: Geo2d) = g.TryApproach args
