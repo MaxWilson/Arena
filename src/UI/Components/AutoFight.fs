@@ -83,28 +83,32 @@ let beginFights (model: Model) dispatch =
         let g = System.Guid.NewGuid()
         Fight InProgress |> dispatch
         async {
-            match model.fightSetup.sideB with
-            | _ when (model.fightSetup.sideA |> List.every (fun group -> group.members |> List.sumBy fst = 0)) ->
-                Fight NotStarted |> dispatch
-                informUserOfError "You have to pick monsters first"
-            | Calibrate({ members = None, _, _, _ }) ->
-                Fight NotStarted |> dispatch
-                informUserOfError "You have to pick monsters first"
-            | Calibrate({ members = (Some name, min, max, defeatCriteria) } as sideB) ->
-                let min = (defaultArg min 50 |> float) / 100.
-                let max = (defaultArg max 90 |> float) / 100.
-                match! calibrate model.database.catalog
-                        model.fightSetup.sideA
-                        (sideB.center, sideB.radius, name, min, max, defeatCriteria) with
-                | minQuantity, maxQuantity, Some sampleMaxFight ->
-                    Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
-                | v ->
+            try
+                match model.fightSetup.sideB with
+                | _ when (model.fightSetup.sideA |> List.every (fun group -> group.members |> List.sumBy fst = 0)) ->
                     Fight NotStarted |> dispatch
-                    informUserOfError "Failed to find a number of monsters that would satisfy those constraints. Try a wider range like 20% to 100%"
-            | Specific(sideB) ->
-                let! fightResult = specificFight model.database.catalog model.fightSetup.sideA sideB
-                (model.fightSetup, SpecificResult fightResult)
-                    |> Completed
-                    |> Fight
-                    |> dispatch
+                    informUserOfError "You have to pick monsters first"
+                | Calibrate({ members = None, _, _, _ }) ->
+                    Fight NotStarted |> dispatch
+                    informUserOfError "You have to pick monsters first"
+                | Calibrate({ members = (Some name, min, max, defeatCriteria) } as sideB) ->
+                    let min = (defaultArg min 50 |> float) / 100.
+                    let max = (defaultArg max 90 |> float) / 100.
+                    match! calibrate model.database.catalog
+                            model.fightSetup.sideA
+                            (sideB.center, sideB.radius, name, min, max, defeatCriteria) with
+                    | minQuantity, maxQuantity, Some sampleMaxFight ->
+                        Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
+                    | v ->
+                        Fight NotStarted |> dispatch
+                        informUserOfError "Failed to find a number of monsters that would satisfy those constraints. Try a wider range like 20% to 100%"
+                | Specific(sideB) ->
+                    let! fightResult = specificFight model.database.catalog model.fightSetup.sideA sideB
+                    (model.fightSetup, SpecificResult fightResult)
+                        |> Completed
+                        |> Fight
+                        |> dispatch
+            with err ->
+                NotStarted |> Fight |> dispatch // reset the UI back to a usable state, which will be shown only after the error is dismissed
+                raise err // cannot reraise() for some reason but hopefully that doesn't matter because JavaScript doesn't give stack traces anyway in this case, even if the try/catch is deleted. Use the browser debugger to get the stack trace if needed.
             } |> Async.StartAsPromise |> ignore

@@ -57,76 +57,8 @@ let Router() =
             ]
         ]
 
-// originally from https://github.com/fable-compiler/fable-react/blob/master/docs/react-error-boundaries.md, but updated to Fable 4
-module ReactErrorBoundary =
-    open Fable.Core
-    open Fable.React
-    open Fable.Core.JsInterop
-
-    [<ReactComponent>]
-    let WindowProtector(child) =
-        let error, setError = React.useState None
-        React.useWindowListener.onError(fun (ev: Browser.Types.UIEvent) -> setError (Some (ev?message)))
-        React.useWindowListener.onUnhandledRejection(fun (ev: Browser.Types.PromiseRejectionEvent) -> setError (Some (ev.reason)))
-        match error with
-        | Some error ->
-            class' "error" Html.div [
-                Html.text $"There has been an error: {error}"
-                Html.div [
-                    Html.button [ prop.onClick (fun _ -> setError None); prop.children [Html.text "Dismiss"] ]
-                    ]
-                ]
-        | None -> child
-
-
-    type [<AllowNullLiteral>] InfoComponentObject =
-        abstract componentStack: string with get
-
-    type ErrorBoundaryProps =
-        {   Inner : React.ReactElement
-            ErrorComponent : string -> (unit -> unit) -> React.ReactElement
-            OnError : exn * InfoComponentObject -> unit }
-
-    type ErrorBoundaryState =
-        { Error : string option }
-
-    // See https://github.com/MangelMaxime/Fulma/blob/master/docs/src/Widgets/Showcase.fs
-    // See https://reactjs.org/docs/error-boundaries.html
-    type ErrorBoundary(props) =
-        inherit React.Component<ErrorBoundaryProps, ErrorBoundaryState>(props)
-        do base.setInitState({ Error = None })
-
-        override this.componentDidCatch(error, info) =
-            let info = info :?> InfoComponentObject
-            this.props.OnError(error, info)
-            this.setState(fun _ _ -> { Error = Some (error.ToString()) })
-
-        override this.render() =
-            let clearError = fun () -> this.setState(fun _ _ -> { Error = None })
-            match this.state.Error with
-            | Some err ->
-                this.props.ErrorComponent err clearError
-            | None ->
-                WindowProtector(this.props.Inner)
-
-    // let ofType props children =
-    //     ReactElementType.create ReactElementType.ofComponent<'T,_,_> props children
-    let renderCatchSimple errorElement element =
-        ReactElementType.create ReactElementType.ofComponent<ErrorBoundary,_,_> { Inner = element; ErrorComponent = errorElement; OnError = fun _ -> () } [ ]
-
-    let renderCatchFn onError errorElement element =
-        ReactElementType.create ReactElementType.ofComponent<ErrorBoundary,_,_> { Inner = element; ErrorComponent = errorElement; OnError = onError } [ ]
-
 let main() =
-    let err msg clearError =
-        class' "error" Html.div [
-            Html.text $"There has been an error: {msg}"
-            Html.div [
-                Html.button [ prop.onClick (fun _ -> clearError()); prop.children [Html.text "Dismiss"] ]
-                ]
-            ]
-    ReactErrorBoundary.renderCatchSimple err <|
-        Router()
+    ReactErrorBoundary.renderCatchSimple ReactErrorBoundary.err <| Router()
 
 let root = ReactDOM.createRoot(document.getElementById "feliz-app")
 root.render(Html.div [ main() ])

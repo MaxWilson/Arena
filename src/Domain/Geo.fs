@@ -18,10 +18,14 @@ module private Impl =
     let distanceLessThan lhs rhs distance = dist lhs rhs <= distance + 0.1<yards>
     let yardsToIndex (v: float<yards>) = (v * 2.) |> int
     let indexToYards (v: int) = (v / 2) |> float |> ( * ) 1.<yards>
+    let indexOf ((x,y): Coords) =
+        (yardsToIndex x, yardsToIndex y)
+    let placesFor coords =
+        let x, y = indexOf coords
+        [ x, y; x + 1, y; x - 1, y; x, y + 1; x, y - 1 ]
 open Impl
 type Place = int * int
-let indexOf ((x,y): Coords) =
-    (yardsToIndex x, yardsToIndex y)
+let indexOf = indexOf
 
 let indexToCoords (x,y) = indexToYards x, indexToYards y
 
@@ -34,14 +38,23 @@ let placesNear coords hexDistance : Place list =
                 x, y
         ]
 
-let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
-    let places coords =
-        let x, y = indexOf coords
-        [ x, y; x + 1, y; x - 1, y; x, y + 1; x, y - 1 ]
+let canPlace (combatantId: CombatantId) coords (geo:Geo2d) =
     let mutable error = None
     let err msg = match error with None -> error <- Some msg | _ -> ()
     let mutable occupants = geo.occupancy
-    let newPlaces = places coords
+    let newPlaces = placesFor coords
+    newPlaces |> List.exists (fun place ->
+        match occupants |> Map.tryFind place with
+        | None -> true
+        | Some priorInhabitant when priorInhabitant = combatantId -> true
+        | Some prior -> false
+        )
+
+let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
+    let mutable error = None
+    let err msg = match error with None -> error <- Some msg | _ -> ()
+    let mutable occupants = geo.occupancy
+    let newPlaces = placesFor coords
     for point in newPlaces do
         if error = None then // we optimize for finding collisions fast, so fail immediately if there's an error
             match occupants |> Map.tryFind point with
@@ -52,7 +65,7 @@ let tryPlace (combatantId: CombatantId) coords (geo:Geo2d) =
     if error = None then // we optimize for finding collisions fast, so fail immediately if there's an error
         match geo.lookup |> Map.tryFind combatantId with
         | Some priorCoords ->
-            for point in priorCoords |> places do
+            for point in priorCoords |> placesFor do
                 match geo.occupancy |> Map.tryFind point with
                 | Some prior when prior = combatantId ->
                     // we want to optimize for finding collisions fast, so we try to add new places before removing old places,
@@ -111,12 +124,14 @@ type Geo2d with
                     |> List.filter(fun place -> distanceLessThan origin (indexToCoords place) radius) // filter out places that we don't have the budget to reach
                     |> List.sortBy (fun place -> this.HexDistanceSquared (coords, indexToCoords place)) // prefer places that are close to the destination
             match candidates |> List.tryPick (fun place ->
-                match tryPlace lhsId coords this with
-                | Ok geo ->
+                if canPlace lhsId coords this then
                     let coords = indexToCoords place
                     let dist = dist origin coords
                     Some (coords, dist, int dist)
-                | _ -> None) with
+                else None
+                ) with
             | Some results -> Some results
             | None -> if radius < (yards 1. * float movementBudget) then placeNear coords (radius + 1.<yards>) else None
         placeNear dest (yards 1. * float movementBudget)
+
+let tryApproach args (g: Geo2d) = g.TryApproach args

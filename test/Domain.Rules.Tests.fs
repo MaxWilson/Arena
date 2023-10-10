@@ -155,4 +155,19 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ after.rapidStrikeBudget = Some 0 @>
         verify <@ after.attackBudget = 0 @>
         verify <@ after.maneuverBudget = 0 @>
+
+    testCase "TryApproach should never ask for an invalid movement--if it returns a result, actually moving there should always work" <| fun() ->
+        let alice = Combatant.fresh(1, "Alice", 1, Creature.create "Alice")
+        let bob = Combatant.fresh(1, "Bob", 1, Creature.create "Bob")
+        let cqrs =
+            let combat =
+                {   combatants = [alice; bob] |> List.map (fun c -> c.Id, c) |> Map.ofList
+                    geo = Geo.ofList [alice.Id, coords (0., 0.); bob.Id, coords (2., 0.)]
+                }
+            CQRS.CQRS.create(combat, CombatAtom.updateCombat)
+        let (goalPos, dist, cost) = cqrs.State.geo |> Geo.tryApproach (bob.Id, Place (coords (2., 0.)), 4) |> Option.get
+        cqrs.Execute (MoveTo(bob.Id, cqrs.State.geo.lookup[bob.Id], goalPos, cost, ""))
+        let (coords, dist, cost) = cqrs.State.geo |> Geo.tryApproach (alice.Id, Place (coords (2., 0.)), 4) |> Option.get
+        cqrs.Execute (MoveTo(bob.Id, cqrs.State.geo.lookup[alice.Id], goalPos, cost, ""))
+        ()
     ]

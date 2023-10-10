@@ -34,7 +34,7 @@ type CQRS<'msg, 'state>(initialState: 'state, execute) =
         | None -> failwith $"Invalid marker: {mark}"
     member this.Log(): 'state list = stateHistoryRev |> List.map (snd >> snd) |> List.rev
     member this.LogWithMessages() : List<'msg option * 'state> = stateHistoryRev |> List.rev |> List.map snd
-    static member Create(st, f) : CQRS<_,_> = CQRS(st, f)
+    static member create(st, f) : CQRS<_,_> = CQRS(st, f)
 
 let cqrsDiff update project (currentState: 'model, knownHistory: 'msg list) (history': 'msg list): 'model * 'notification list =
     let recentHistoryRev = history' |> List.take (history'.Length - knownHistory.Length) |> List.rev

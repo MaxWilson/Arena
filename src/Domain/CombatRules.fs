@@ -432,7 +432,7 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
 let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), aug -> Some(Some msg, aug.combat) | None, aug -> Some(None, aug.combat))
 
 let specificFight db team1 team2 = async {
-    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), CombatAtom.update)
+    let cqrs = CQRS.CQRS.create((createCombat db team1 team2), CombatAtom.update)
     let victors = fight cqrs
     return (cqrs.LogWithMessages() |> loggedOnly), victors
     }
@@ -453,7 +453,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
     let runForN n = async {
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
         let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
-        let cqrs = CQRS.CQRS.Create(combat, CombatAtom.update)
+        let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
         return cqrs, fight cqrs
         }
     let mutable results: Map<_,int*AugmentedCombatLog> = Map.empty

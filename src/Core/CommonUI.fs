@@ -29,3 +29,74 @@ type React =
             setter state
             state, setter
         else currentValue, setter
+
+// originally from https://github.com/fable-compiler/fable-react/blob/master/docs/react-error-boundaries.md, but updated to Fable 4
+module ReactErrorBoundary =
+    open Fable.Core
+    open Fable.React
+    open Fable.Core.JsInterop
+    open Feliz
+    open Feliz.Router
+    open Feliz.Listeners
+    open Browser.Dom
+    open Fable
+    open Fable.Core.JsInterop
+
+    let err msg clearError =
+        class' "error" Html.div [
+            Html.text $"There has been an error: {msg}"
+            Html.div [
+                Html.button [ prop.onClick (fun _ -> clearError()); prop.children [Html.text "Dismiss"] ]
+                ]
+            ]
+
+    [<ReactComponent>]
+    let WindowProtector(error, setError, child) =
+        React.useWindowListener.onError(fun (ev: Browser.Types.UIEvent) -> setError (Some (ev?message: string)))
+        React.useWindowListener.onUnhandledRejection(fun (ev: Browser.Types.PromiseRejectionEvent) -> setError (Some (ev.reason.ToString())))
+        let child = Html.div [prop.children [child]; prop.style [Feliz.style.margin (length.px 0); if Option.isSome error then Feliz.style.display.none]]
+        React.fragment [
+            child
+            match error with
+            | Some error ->
+                class' "error" Html.div [
+                    Html.text $"There has been an error: {error}"
+                    Html.div [
+                        Html.button [ prop.onClick (fun _ -> setError None); prop.children [Html.text "Dismiss"] ]
+                        ]
+                    ]
+            | None -> ()
+            ]
+
+    type [<AllowNullLiteral>] InfoComponentObject =
+        abstract componentStack: string with get
+
+    type ErrorBoundaryProps =
+        {   Inner : React.ReactElement
+            ErrorComponent : string -> (unit -> unit) -> React.ReactElement
+            OnError : exn * InfoComponentObject -> unit }
+
+    type ErrorBoundaryState =
+        { Error : string option }
+
+    // See https://github.com/MangelMaxime/Fulma/blob/master/docs/src/Widgets/Showcase.fs
+    // See https://reactjs.org/docs/error-boundaries.html
+    type ErrorBoundary(props) =
+        inherit React.Component<ErrorBoundaryProps, ErrorBoundaryState>(props)
+        do base.setInitState({ Error = None })
+
+        override this.componentDidCatch(error, info) =
+            let info = info :?> InfoComponentObject
+            this.props.OnError(error, info)
+            this.setState(fun _ _ -> { Error = Some (error.ToString()) })
+
+        override this.render() =
+            let setError v = this.setState(fun _ _ -> { Error = v })
+            let clearError = fun () -> setError None
+            WindowProtector(this.state.Error, setError, this.props.Inner)
+
+    let renderCatchSimple errorElement element =
+        ReactElementType.create ReactElementType.ofComponent<ErrorBoundary,_,_> { Inner = element; ErrorComponent = errorElement; OnError = fun _ -> () } [ ]
+
+    let renderCatchFn onError errorElement element =
+        ReactElementType.create ReactElementType.ofComponent<ErrorBoundary,_,_> { Inner = element; ErrorComponent = errorElement; OnError = onError } [ ]
