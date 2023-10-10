@@ -258,22 +258,25 @@ module ExecuteAction =
             Miss({ attacker = attacker.Id; target = victim.Id }, details.rapidStrike, msg)
             |> loggedExecute
 
-    let doMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
+    let tryMove msg cqrsExecute (ctx: ActionContext) (dest:Destination) =
         let startPos = ctx.geo.Find(ctx.me)
         match ctx.me_ with
         | AvailableMove(moveBudget, me) ->
-            let goalPos, euclideanDistance, cost = ctx.geo.Approach(ctx.me, dest, moveBudget)
-            let msg =
-                match dest with
-                | Person p when euclideanDistance > 0.5<yards> ->
-                    $"moves %.1f{euclideanDistance} yards toward {ctx.combat.combatants[p].personalName}"
-                | Person p ->
-                    $"moves a little towards {ctx.combat.combatants[p].personalName}"
-                | Place coords when euclideanDistance > 0.5<yards> ->
-                    $"moves %.1f{euclideanDistance} yards"
-                | Place coords ->
-                    $"moves a little"
-            cqrsExecute (Logged(MoveTo(me.Id, ctx.geo.Find ctx.me, goalPos, cost, msg)))
+            match ctx.geo.TryApproach(ctx.me, dest, moveBudget) with
+            | Some (goalPos, hexDistance, cost) ->
+                let msg =
+                    match dest with
+                    | Person p when hexDistance > 0.5<yards> ->
+                        $"moves %.1f{hexDistance} yards toward {ctx.combat.combatants[p].personalName}"
+                    | Person p ->
+                        $"moves a little towards {ctx.combat.combatants[p].personalName}"
+                    | Place coords when hexDistance > 0.5<yards> ->
+                        $"moves %.1f{hexDistance} yards"
+                    | Place coords ->
+                        $"moves a little"
+                cqrsExecute (Logged(MoveTo(me.Id, ctx.geo.Find ctx.me, goalPos, cost, msg)))
+                true
+            | None -> false // if there's no space to move even a little, we'll try again next turn
         | _ -> shouldntHappen "We should have already checked move"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
@@ -294,8 +297,11 @@ module ExecuteAction =
                 doAttack msg cqrsExecute ctx { details with rapidStrike = false }
                 attempt "" followup
             | AwaitingAction(Move(dest), followup), AvailableMove (points, me) ->
-                doMove msg cqrsExecute ctx dest
-                attempt "" followup
+                if tryMove msg cqrsExecute ctx dest then
+                    attempt "" followup
+                else
+                    // if there's no space in range, try again next turn
+                    Some unchanged
             | AwaitingAction(action, _), _ -> Some unchanged // We can't afford this action now. Treat it as if it were a Yield: rerun the original behavior next turn and see if the same action is requested/affordable.
         attempt 0 msg behavior
 
