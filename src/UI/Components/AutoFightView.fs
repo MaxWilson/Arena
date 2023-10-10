@@ -333,7 +333,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                         | v when v |> List.contains Unconscious -> hit "KOs"
                         | v when v |> List.contains Stunned -> hit "stuns"
                         | v when v |> List.contains Berserk ->
-                            div [bigHit; name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for"; hpText injury; viewDetails rollDetails]
+                            div [bigHit; name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for "; hpText injury; viewDetails rollDetails]
                         | _ ->
                             div [regularHit; name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for "; hpText injury; viewDetails rollDetails]
                     | SuccessfulDefense(ids, _, { defense = Parry }, rollDetails) ->

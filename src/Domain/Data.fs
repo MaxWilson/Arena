@@ -384,7 +384,7 @@ module Resourcing =
     let (|ConsumeAttack|_|) (c:Combatant) =
         match c with
         | c when c.attackBudget > 0 -> Some { c with attackBudget = c.attackBudget - 1}
-        | ConsumeManeuver c -> Some { c with attackBudget = c.attackBudget + c.stats.ExtraAttack_; rapidStrikeBudget = None } // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
+        | ConsumeManeuver c -> Some { c with attackBudget = c.attackBudget + c.stats.ExtraAttack_ + (if c.is Berserk then 1 else 0); rapidStrikeBudget = None } // NOT 1+ExtraAttacks, because we're consuming one of the attacks right now as well as consuming a maneuver
         | _ -> None
     let (|ConsumeRapidStrike|_|) (c:Combatant) =
         match c with
