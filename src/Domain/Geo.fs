@@ -39,12 +39,9 @@ let placesNear coords hexDistance : Place list =
         ]
 
 let canPlace (combatantId: CombatantId) coords (geo:Geo2d) =
-    let mutable error = None
-    let err msg = match error with None -> error <- Some msg | _ -> ()
-    let mutable occupants = geo.occupancy
     let newPlaces = placesFor coords
-    newPlaces |> List.exists (fun place ->
-        match occupants |> Map.tryFind place with
+    newPlaces |> List.every (fun place ->
+        match geo.occupancy |> Map.tryFind place with
         | None -> true
         | Some priorInhabitant when priorInhabitant = combatantId -> true
         | Some prior -> false
