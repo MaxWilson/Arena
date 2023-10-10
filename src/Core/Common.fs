@@ -16,7 +16,7 @@ exception BugException of msg: string
 let notImpl v = failwith $"Not implemented yet. Email Max if you want this feature. {v}"
 let shouldntHappen arg =
     $"This shouldn't ever happen. If it does there's a bug. Details: {arg}" |> BugException |> raise
-let breakHere() = System.Diagnostics.Debugger.Break()
+let inline breakHere() = System.Diagnostics.Debugger.Break()
 
 type Any = obj
 let viaAny<'t>() = box<'t>, unbox<'t>

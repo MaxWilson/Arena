@@ -162,7 +162,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let cqrs =
             let combat =
                 {   combatants = [alice; bob] |> List.map (fun c -> c.Id, c) |> Map.ofList
-                    geo = Geo.ofList [alice.Id, coords (0., 0.); bob.Id, coords (2., 0.)]
+                    geo = Geo.ofList [alice.Id, coords (0., 0.); bob.Id, coords (0., 2.)]
                 }
             CQRS.CQRS.create(combat, CombatAtom.updateCombat)
         let (goalPos, dist, cost) = cqrs.State.geo |> Geo.tryApproach (bob.Id, Place (coords (2., 0.)), 4) |> Option.get

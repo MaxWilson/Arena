@@ -95,11 +95,13 @@ type Line(origin, dest) =
     member _.Length = length
     member _.Origin = origin
     member this.Extend (distance: Distance) = // TODO: find a better name than "extend". Basically, go this far in the direction of dest and return the new dest.
-        let origX, origY = origin
-        let destX, destY = dest
-        let (dx, dy) = destX - origX, destY - origY
-        let (dx, dy) = (dx / length, dy / length)
-        (origX + dx * distance, origY + dy * distance)
+        if distance = 0.<yards> then origin
+        else
+            let origX, origY = origin
+            let destX, destY = dest
+            let (dx, dy) = destX - origX, destY - origY
+            let (dx, dy) = (dx / length, dy / length)
+            (origX + dx * distance, origY + dy * distance)
 
 type Geo2d with
     member this.Find id = this.lookup[id]
@@ -112,26 +114,27 @@ type Geo2d with
     member this.LineFrom (lhsPos: Coords, rhsPos: Coords) = Line(lhsPos, rhsPos)
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
     member this.TryApproach (lhsId, dest: Destination, movementBudget: int) : (Coords * float<yards> * int) option =
+        let movementBudgetInHexes = float movementBudget * 1.<yards>
         let line =
             match dest with
             | Person dest -> this.LineFrom(lhsId, dest)
             | Place dest -> this.LineFrom(this.Find lhsId, dest)
         let origin = line.Origin
-        let dest = line.Extend (movementBudget |> float |> (( * ) 1.<yards>))
+        let dest = line.Extend (min line.Length movementBudgetInHexes)
+        let destDupe = dest
+        printfn $"Dest is {dest}"
         let rec placeNear coords radius =
             let candidates =
                 placesNear coords radius
-                    |> List.filter(fun place -> distanceLessThan origin (indexToCoords place) radius) // filter out places that we don't have the budget to reach
-                    |> List.sortBy (fun place -> this.HexDistanceSquared (coords, indexToCoords place)) // prefer places that are close to the destination
-            match candidates |> List.tryPick (fun place ->
-                if canPlace lhsId coords this then
-                    let coords = indexToCoords place
-                    let dist = dist origin coords
-                    Some (coords, dist, int dist)
-                else None
-                ) with
-            | Some results -> Some results
-            | None -> if radius < (yards 1. * float movementBudget) then placeNear coords (radius + 1.<yards>) else None
-        placeNear dest (yards 1. * float movementBudget)
+                |> List.filter(fun place -> distanceLessThan origin (indexToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
+                |> List.sortBy (fun place -> this.HexDistanceSquared (coords, indexToCoords place)) // prefer places that are close to the destination
+            match candidates |> List.tryFind (fun place -> canPlace lhsId (indexToCoords place) this) with
+            | Some place ->
+                let coords = indexToCoords place
+                let dist = dist origin coords
+                Some (coords, dist, int dist)
+            | None ->
+                if radius < movementBudgetInHexes then placeNear coords (radius + 1.<yards>) else None
+        placeNear dest (yards 1.)
 
 let tryApproach args (g: Geo2d) = g.TryApproach args
