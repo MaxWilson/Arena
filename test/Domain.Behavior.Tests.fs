@@ -56,8 +56,11 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
                 radius = Some 0.<yards>
                 }]
         // we don't care who's in the combat as long as there's someone on both sides and they're in range of each other
-        let combatAt pos = createCombat (["Bob", Creature.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] pos) |> fun c -> c.combat
-
+        let combatAt pos =
+            let c = createCombat (["Bob", Creature.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] pos) |> fun c -> c.combat
+            let actual = c.geo.Find (2, "Bob")
+            verify <@ pos = actual @>
+            c
         let bob = (1, "Bob")
         let toCtx combat = { me = bob; combat = combat }
 
