@@ -16,12 +16,12 @@ module private Impl =
         bigger * bigger + smaller * smaller
     let dist lhs rhs = distSquared lhs rhs |> sqrt
     let distanceLessThan lhs rhs distance = dist lhs rhs <= distance + 0.1<yards>
-    let yardsToIndex (v: float<yards>) = (v * 2.) |> int
-    let indexToYards (v: int) = (v / 2) |> float |> ( * ) 1.<yards>
-    let indexOf ((x,y): Coords) =
-        (yardsToIndex x, yardsToIndex y)
+    let yardsToPlaces (v: float<yards>) = (v * 2.) |> int
+    let placesToYards (v: int) = (v / 2) |> float |> ( * ) 1.<yards>
+    let placesOf ((x,y): Coords) =
+        (yardsToPlaces x, yardsToPlaces y)
     let placesFor coords =
-        let x, y = indexOf coords
+        let x, y = placesOf coords
         [ x, y; x - 1, y; x, y - 1; x - 1, y - 1 ]
 open Impl
 
@@ -48,12 +48,12 @@ Observe that places correspond to *areas* of obstruction, not points.
 
 // Zero-based index into geo.occupancy, with each integer increment representing a move of 0.5 yards.
 type Place = int * int
-let indexOf = indexOf
+let placeOf = placesOf
 
-let indexToCoords (x,y) = indexToYards x, indexToYards y
+let placesToCoords (x,y) = placesToYards x, placesToYards y
 
 let placesNear coords hexDistance : Place list =
-    let x0, y0 = indexOf coords
+    let x0, y0 = placeOf coords
     let placeDistance = (hexDistance * 2.) |> int
     [ for x in x0 - placeDistance .. x0 + placeDistance do
         for y in y0 - placeDistance .. y0 + placeDistance do
@@ -146,11 +146,11 @@ type Geo2d with
         let rec placeNear coords radius =
             let candidates =
                 placesNear coords radius
-                |> List.filter(fun place -> distanceLessThan origin (indexToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
-                |> List.sortBy (fun place -> this.HexDistanceSquared (coords, indexToCoords place)) // prefer places that are close to the destination
-            match candidates |> List.tryFind (fun place -> canPlace lhsId (indexToCoords place) this) with
+                |> List.filter(fun place -> distanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
+                |> List.sortBy (fun place -> this.HexDistanceSquared (origin, placesToCoords place)) // prefer moving as little as possible, in part to help surround enemies by not aligning perfectly on 4 sides.
+            match candidates |> List.tryFind (fun place -> canPlace lhsId (placesToCoords place) this) with
             | Some place ->
-                let coords = indexToCoords place
+                let coords = placesToCoords place
                 let dist = dist origin coords
                 Some (coords, dist, int dist)
             | None ->

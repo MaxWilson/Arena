@@ -11,12 +11,12 @@ let shouldFail = Swensen.Unquote.Assertions.raises
 [<Tests>]
 let Tests = testLabel "Unit" <| testList "Geo" [
     testCase "Spot-check coords to index conversions" <| fun () ->
-        verify <@ Geo.indexOf (coords(0., 0.)) = (0, 0) @>
-        verify <@ Geo.indexOf (coords(1., 0.)) = (2, 0) @>
-        verify <@ Geo.indexOf (coords(1., 3.5)) = (2, 7) @>
-        verify <@ Geo.indexOf (coords(-1., -1)) = (-2, -2) @>
-        verify <@ Geo.indexOf (coords(0, -1)) = (0, -2) @>
-        verify <@ Geo.indexOf (coords(0, -0.5)) = (0, -1) @>
+        verify <@ Geo.placeOf (coords(0., 0.)) = (0, 0) @>
+        verify <@ Geo.placeOf (coords(1., 0.)) = (2, 0) @>
+        verify <@ Geo.placeOf (coords(1., 3.5)) = (2, 7) @>
+        verify <@ Geo.placeOf (coords(-1., -1)) = (-2, -2) @>
+        verify <@ Geo.placeOf (coords(0, -1)) = (0, -2) @>
+        verify <@ Geo.placeOf (coords(0, -0.5)) = (0, -1) @>
     testCase "Spot-check Geo lines" <| fun () ->
         let g = Geo.ofList [
             (1, "Bob"), (0.<yards>, 0.<yards>)

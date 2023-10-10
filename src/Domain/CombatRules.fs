@@ -288,7 +288,9 @@ module ExecuteAction =
         let rec attempt counter msg (behavior as unchanged) =
             let ctx = getCtx()
 #if DEBUG
-            if counter > 1000 then shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop"
+            if counter > 1000 then
+                let action = match behavior(feedback, ctx) with | Finished _ -> None | AwaitingAction(a, _) -> Some a
+                shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop. The next action in the behavior would be {action}."
 #endif
             let attempt = attempt (counter + 1)
             match (behavior(feedback, ctx), ctx.me_) with
