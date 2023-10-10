@@ -22,8 +22,31 @@ module private Impl =
         (yardsToIndex x, yardsToIndex y)
     let placesFor coords =
         let x, y = indexOf coords
-        [ x, y; x + 1, y; x - 1, y; x, y + 1; x, y - 1 ]
+        [ x, y; x - 1, y; x, y - 1; x - 1, y - 1 ]
 open Impl
+
+(* places equate to the top left corner of a part of a hex.
+
+112233445566
+112233445566
+778899AABBCC
+778899AABBCC
+EEFFGGHHIIJJ
+EEFFGGHHIIJJ
+
+1 is a hex, and 2 is a hex too, but
+
+12
+12
+
+is also a hex, 0.5 to the right of 1. Each hex has four places, and each place is a zero-based index
+into the hex grid. 0.0 yards to the right = hex 1 = places 0 and 1 along the x axis.
+
+Observe that places correspond to *areas*, not points.
+
+*)
+
+// Zero-based index into geo.occupancy, with each integer increment representing a move of 0.5 yards.
 type Place = int * int
 let indexOf = indexOf
 
