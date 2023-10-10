@@ -18,10 +18,10 @@ module private Impl =
     let distanceLessThan lhs rhs distance = dist lhs rhs <= distance + 0.1<yards>
     let yardsToPlaces (v: float<yards>) = (v * 2.) |> int
     let placesToYards (v: int) = (v / 2) |> float |> ( * ) 1.<yards>
-    let placesOf ((x,y): Coords) =
+    let placeOf ((x,y): Coords) =
         (yardsToPlaces x, yardsToPlaces y)
     let placesFor coords =
-        let x, y = placesOf coords
+        let x, y = placeOf coords
         [ x, y; x - 1, y; x, y - 1; x - 1, y - 1 ]
 open Impl
 
@@ -48,7 +48,7 @@ Observe that places correspond to *areas* of obstruction, not points.
 
 // Zero-based index into geo.occupancy, with each integer increment representing a move of 0.5 yards.
 type Place = int * int
-let placeOf = placesOf
+let placeOf = placeOf
 
 let placesToCoords (x,y) = placesToYards x, placesToYards y
 
@@ -141,8 +141,6 @@ type Geo2d with
             | Place dest -> this.LineFrom(this.Find lhsId, dest)
         let origin = line.Origin
         let dest = line.Extend (min line.Length movementBudgetInHexes)
-        let destDupe = dest
-        printfn $"Dest is {dest}"
         let rec placeNear coords radius =
             let candidates =
                 placesNear coords radius
