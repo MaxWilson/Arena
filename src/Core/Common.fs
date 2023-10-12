@@ -425,3 +425,11 @@ let inline trace v =
 #endif
     v
 
+// log for dev purposes, for when exceptions aren't quite enough context
+let inline devLog v =
+#if DEBUG
+    printfn "%s" v
+#endif
+    ()
+
+
