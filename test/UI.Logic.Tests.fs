@@ -9,8 +9,21 @@ open Domain.Random
 open Domain.Random.Parser
 open Swensen.Unquote
 
-let findRange = notImpl
-
+let findRange bound1 bound2 evaluate =
+    let lower, upper = min bound1 bound2, max bound1 bound2
+    let (|TooLow|JustRight|TooHigh|) n =
+        let v = evaluate n
+        if v > upper then TooHigh // if victory percentage is too high, we need to increase n
+        elif v < lower then TooLow // if victory percentage is too low, we need to decrease n
+        else JustRight
+    // first, look for a bound on the *upper* bound
+    let rec step1 n =
+        match n with
+        | TooLow | JustRight -> step1 (n * 2)
+        | TooHigh ->
+            let range = (1, n)
+            notImpl "now we just do a binary search on [1, n] for both upper bound and lower bound"
+    step1 1
 [<Tests>]
 let Tests() = (testLabel "Unit") <| testList "UI" [
     testCase "Spot-check AutoFight.calibrate using mocked evaluation" <| fun () ->
@@ -26,7 +39,7 @@ let Tests() = (testLabel "Unit") <| testList "UI" [
                 else 0
             |]
         let getVal n = vals.[n]
-        test <@ findRange 50 90 getVal = 11 @>
+        test <@ findRange 50 90 getVal = (11, 30) @>
     testCase "Placeholder for property testing AutoFight.calibrate" <| fun () ->
         // not sure if this is really necessary
         property {
