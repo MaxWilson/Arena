@@ -441,11 +441,6 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
 // convert a CombatFullLog to CombatLog, to make display easier by filtering out housekeeping events
 let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), aug -> Some(Some msg, aug.combat) | None, aug -> Some(None, aug.combat))
 
-let specificFight db team1 team2 = async {
-    let cqrs = CQRS.CQRS.create((createCombat db team1 team2), CombatAtom.update)
-    let victors = fight cqrs
-    return (cqrs.LogWithMessages() |> loggedOnly), victors
-    }
 
 module Team =
     let randomInitialPosition members : _ GroupSetup =
@@ -459,67 +454,3 @@ module Team =
     let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
     let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
 
-let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
-    let enemyStats = db[enemyType]
-    let runForN n = async {
-        do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
-        let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
-        let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
-        return cqrs, fight cqrs
-        }
-    let mutable results: Map<_,int*AugmentedCombatLog> = Map.empty
-    let get n = async {
-        inform $"Evaluating vs. {enemyStats.Quantify n}"
-        if results.ContainsKey n then return results[n]
-        else
-            let! runs =
-                [
-                    for run in 1..10 do
-                        runForN n
-                    ]
-                |> Async.Parallel
-            let sampleLog: AugmentedCombatLog = (runs |> Array.last |> fst).LogWithMessages()
-            let victoryMetric : CQRS.CQRS<_, AugmentedCombat> * {| victors: int list |} -> int =
-                match defeatCriteria with
-                | TPK -> function (_, v) when v.victors = [1] -> 1 | otherwise -> 0
-                | OneCasualty ->
-                    fun (cqrs, v) ->
-                        // in this case, TeamA is very casualty-averse. Defeat is taking even one casualty (dead or unconscious).
-                        if cqrs.State.combat.combatants.Values |> Seq.exists (fun c ->
-                            c.team = 1 && c.isAny[Dead; Unconscious]) then
-                            0
-                        else 1
-                | HalfCasualties ->
-                    fun (cqrs, v) ->
-                        // in this case, TeamA is somewhat casualty-averse. Defeat is a pyrrhic victory where at least half the team dies.
-                        let friendlies = cqrs.State.combat.combatants.Values |> Seq.filter (fun c -> c.team = 1)
-                        let deadFriendlies = friendlies |> Seq.filter (fun c -> c.isAny[Dead; Unconscious])
-                        if deadFriendlies |> Seq.length >= ((friendlies |> Seq.length) / 2) then
-                            0
-                        else 1
-
-            let victories = runs |> Array.sumBy victoryMetric
-            results <- results |> Map.add n (victories, sampleLog |> List.filter (function Some (Unlogged _), _ -> false | _ -> true))
-            return results[n]
-        }
-    // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
-    let! upToOneHundred =
-        let rec loop n = async {
-            let! (victories, log) as result = get n
-            if victories > 0 && n <= 100 then
-                let! looped = loop (n+1)
-                return (n, result)::looped
-            else return []
-            }
-        loop 1
-    let inbounds (n, result) =
-        betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (result |> fst)
-
-    match upToOneHundred |> List.filter inbounds with
-    | [] ->
-        return None, None, None
-    | inbounds ->
-        let min, _ = inbounds |> List.minBy fst
-        let max, (_, sampleFight) = inbounds |> List.maxBy fst
-        return Some min, Some max, Some (loggedOnly sampleFight)
-    }
