@@ -80,6 +80,7 @@ let specificFight db team1 team2 = async {
     let victors = fight cqrs
     return (cqrs.LogWithMessages() |> loggedOnly), victors
     }
+
 let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
     let enemyStats = db[enemyType]
     let runForN n = async {
@@ -123,6 +124,7 @@ let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, r
             results <- results |> Map.add n (victories, sampleLog |> List.filter (function Some (Unlogged _), _ -> false | _ -> true))
             return results[n]
         }
+
     // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
     let! upToOneHundred =
         let rec loop n = async {
