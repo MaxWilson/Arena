@@ -79,6 +79,11 @@ module Tuple2 =
         | _ -> shouldntHappen "Tuple2.ofList: list must have exactly 2 elements"
     let toList (x,y) = [x;y]
 
+module Tuple3 =
+    let get1 (x,_,_) = x
+    let get2 (_,x,_) = x
+    let get get3 (_,_,x) = x
+
 module Ctor =
     type AnonymousConstructor<'args, 'Type> = {
         create: 'args -> 'Type
