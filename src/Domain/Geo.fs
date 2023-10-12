@@ -22,10 +22,10 @@ module private Impl =
         (yardsToPlaces x, yardsToPlaces y)
     let placesFor coords =
         let x, y = placeOf coords
-        [ x, y; x - 1, y; x, y - 1; x - 1, y - 1 ]
+        [ x, y; x + 1, y; x, y + 1; x + 1, y + 1 ]
 open Impl
 
-(* places equate to the top left corner of a part of a hex.
+(* places equate to the zero-based index of a part of a hex.
 
 112233445566
 112233445566
@@ -145,7 +145,7 @@ type Geo2d with
             let candidates =
                 placesNear coords radius
                 |> List.filter(fun place -> distanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
-                |> List.sortBy (fun place -> this.HexDistanceSquared (origin, placesToCoords place)) // prefer moving as little as possible, in part to help surround enemies by not aligning perfectly on 4 sides.
+                |> List.sortBy (fun place -> this.HexDistanceSquared (coords, placesToCoords place), this.HexDistanceSquared (origin, placesToCoords place)) // prefer moving as little as possible while getting as hex-close to the target as possible, in part to help surround enemies by not aligning perfectly on 4 sides.
             match candidates |> List.tryFind (fun place -> canPlace lhsId (placesToCoords place) this) with
             | Some place ->
                 let coords = placesToCoords place
