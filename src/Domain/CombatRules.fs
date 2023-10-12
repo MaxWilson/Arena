@@ -293,8 +293,8 @@ module ExecuteAction =
                 if counter > 1000 then
                     shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop. The next action in the behavior would be {action}."
                 else
-                    printfn $"Action[{ctx.me}, {counter}] = {action}"
-                    printfn $"{ctx.me} is at {ctx.geo.Find ctx.me}"
+                    devLog $"Action[{ctx.me}, {counter}] = {action}"
+                    devLog $"{ctx.me} is at {ctx.geo.Find ctx.me}"
 #endif
             let attempt = attempt (counter + 1)
             match (behavior(feedback, ctx), ctx.me_) with
