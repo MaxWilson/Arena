@@ -362,9 +362,9 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
 [<ReactComponent>]
 let ExecuteButton (model:Model) dispatch =
     match model.execution with
-    | InProgress ->
+    | InProgress msg ->
         class' "fadeIn" Html.div [
-            Html.div "Executing..."
+            Html.div (defaultArg msg "Executing...")
             class' "busy" Html.div [
                 for _ in 1..10 do
                     class' "wave" Html.div []
@@ -578,7 +578,7 @@ let View (model: Model) dispatch =
                         ]
                     ExecuteButton model dispatch
                     match model.execution with
-                    | NotStarted | InProgress -> ()
+                    | NotStarted | InProgress _ -> ()
                     | Completed (setup, result) ->
                         let db = model.database
                         let teamToTxt team =

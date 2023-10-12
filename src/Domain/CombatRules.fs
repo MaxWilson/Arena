@@ -459,7 +459,8 @@ module Team =
     let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
     let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
 
-let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
+let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
+    let enemyStats = db[enemyType]
     let runForN n = async {
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
         let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
@@ -468,6 +469,7 @@ let calibrate db (team1: TeamSetup) (center: Coords, radius: Distance option, en
         }
     let mutable results: Map<_,int*AugmentedCombatLog> = Map.empty
     let get n = async {
+        inform $"Evaluating vs. {enemyStats.Quantify n}"
         if results.ContainsKey n then return results[n]
         else
             let! runs =
