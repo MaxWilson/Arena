@@ -4,7 +4,7 @@ open Domain.Data
 module private Impl =
 
     // we're using hex distance instead of euclidean distance
-    let distSquared ((lx, ly): Coords) ((rx, ry): Coords) =
+    let hexDistSquared ((lx, ly): Coords) ((rx, ry): Coords) =
         let dx = lx - rx |> abs
         let dy = ly - ry |> abs
         let bigger = max dx dy
@@ -14,10 +14,15 @@ module private Impl =
             | v, lateralMargin when v <= lateralMargin -> 0.<yards>
             | v, lateralMargin -> v - lateralMargin
         bigger * bigger + smaller * smaller
-    let dist lhs rhs = distSquared lhs rhs |> sqrt
-    let distanceLessThan lhs rhs distance = dist lhs rhs <= distance + 0.1<yards>
+    let hexDist lhs rhs = hexDistSquared lhs rhs |> sqrt
+    let hexDistanceLessThan lhs rhs distance = hexDist lhs rhs <= distance + 0.1<yards>
+    let euclideanSquared (lx, ly) (rx, ry) =
+        // usually we should use hex distance, but euclidean sometimes makes sense for sorting more finely than hex distance can manage
+        let dx = lx - rx
+        let dy = ly - ry
+        dx * dx + dy * dy
     let yardsToPlaces (v: float<yards>) = (v * 2.) |> int
-    let placesToYards (v: int) = (v / 2) |> float |> ( * ) 1.<yards>
+    let placesToYards (v: int) = v |> float |> ( * ) 0.5<yards>
     let placeOf ((x,y): Coords) =
         (yardsToPlaces x, yardsToPlaces y)
     let placesFor coords =
@@ -57,7 +62,7 @@ let placesNear coords hexDistance : Place list =
     let placeDistance = (hexDistance * 2.) |> int
     [ for x in x0 - placeDistance .. x0 + placeDistance do
         for y in y0 - placeDistance .. y0 + placeDistance do
-            if distanceLessThan coords (Data.coords (float x / 2. , float y / 2.)) hexDistance then
+            if hexDistanceLessThan coords (Data.coords (float x / 2. , float y / 2.)) hexDistance then
                 x, y
         ]
 
@@ -111,7 +116,7 @@ let ofList lst =
     lst |> List.fold (fun geo (id, coords) -> place id coords geo) { lookup = Map.empty; obstructions = Map.empty }
 
 type Line(origin, dest) =
-    let length = dist origin dest
+    let length = hexDist origin dest
     member _.Length = length
     member _.Origin = origin
     member this.Extend (distance: Distance) = // TODO: find a better name than "extend". Basically, go this far in the direction of dest and return the new dest.
@@ -125,12 +130,12 @@ type Line(origin, dest) =
 
 type Geo2d with
     member this.Find id = this.lookup[id]
-    member this.WithinDistance(lhsPos, rhsPos, distance) = distanceLessThan lhsPos rhsPos distance
-    member this.WithinDistance(lhsId, rhsId, distance) = distanceLessThan (this.Find lhsId) (this.Find rhsId) distance
-    member this.HexDistanceSquared(lhsPos, rhsPos) = distSquared lhsPos rhsPos
-    member this.HexDistanceSquared(lhsId, rhsId) = distSquared (this.Find lhsId) (this.Find rhsId)
-    member this.HexDistanceSquared(lhsId, rhsPos) = distSquared (this.Find lhsId) rhsPos
-    member this.HexDistanceSquared(lhsPos, rhsId) = distSquared lhsPos (this.Find rhsId)
+    member this.WithinDistance(lhsPos, rhsPos, distance) = hexDistanceLessThan lhsPos rhsPos distance
+    member this.WithinDistance(lhsId, rhsId, distance) = hexDistanceLessThan (this.Find lhsId) (this.Find rhsId) distance
+    member this.HexDistanceSquared(lhsPos, rhsPos) = hexDistSquared lhsPos rhsPos
+    member this.HexDistanceSquared(lhsId, rhsId) = hexDistSquared (this.Find lhsId) (this.Find rhsId)
+    member this.HexDistanceSquared(lhsId, rhsPos) = hexDistSquared (this.Find lhsId) rhsPos
+    member this.HexDistanceSquared(lhsPos, rhsId) = hexDistSquared lhsPos (this.Find rhsId)
     member this.LineFrom (lhsPos: Coords, rhsPos: Coords) = Line(lhsPos, rhsPos)
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
     member this.TryApproach (lhsId, dest: Destination, movementBudget: int) : (Coords * float<yards> * int) option =
@@ -142,24 +147,25 @@ type Geo2d with
         let origin = line.Origin
         let originPlace = placeOf origin
         let dest = line.Extend (min line.Length movementBudgetInHexes)
-        let rec placeNear coords radius =
+        let rec placeNear dest radius =
             let candidates =
-                placesNear coords radius
+                placesNear dest radius
                 |> List.filter(fun place ->
                     place <> originPlace // ignore the starting place because not moving would be useless
-                    && distanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
-                |> List.sortBy (fun place -> this.HexDistanceSquared (coords, placesToCoords place), this.HexDistanceSquared (origin, placesToCoords place)) // prefer moving as little as possible while getting as hex-close to the target as possible, in part to help surround enemies by not aligning perfectly on 4 sides.
-            let display =
-                candidates |> Array.ofList
-                |> Array.map (fun pl -> pl, placesToCoords pl) |> sprintf "%A"
-            //printfn $"Candidates include: {display}"
+                    && hexDistanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
+                |> List.sortBy (fun place ->
+                                    let placeCoords = placesToCoords place
+                                    this.HexDistanceSquared (dest, placeCoords), // prefer moving as little as possible while getting as hex-close to the target as possible,
+                                    this.HexDistanceSquared (origin, placeCoords), // in part to help surround enemies by not aligning perfectly on 4 sides.
+                                    euclideanSquared origin placeCoords // Use euclidean distance as a tie breaker because it looks prettier than having a bias towards the leftmost place.
+                                    )
             match candidates |> List.tryFind (fun place -> canPlace lhsId (placesToCoords place) this) with
             | Some place ->
                 let coords = placesToCoords place
-                let dist = dist origin coords
+                let dist = hexDist origin coords
                 Some (coords, dist, Ops.roundUp dist |> int)
             | None ->
-                if radius < movementBudgetInHexes then placeNear coords (radius + 1.<yards>) else None
+                if radius < movementBudgetInHexes then placeNear dest (radius + 1.<yards>) else None
         placeNear dest (yards 1.)
 
     // leave combatantId in lookup so it can be displayed, but remove it from obstructions
