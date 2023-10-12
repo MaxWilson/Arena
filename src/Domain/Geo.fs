@@ -140,17 +140,24 @@ type Geo2d with
             | Person dest -> this.LineFrom(lhsId, dest)
             | Place dest -> this.LineFrom(this.Find lhsId, dest)
         let origin = line.Origin
+        let originPlace = placeOf origin
         let dest = line.Extend (min line.Length movementBudgetInHexes)
         let rec placeNear coords radius =
             let candidates =
                 placesNear coords radius
-                |> List.filter(fun place -> distanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
+                |> List.filter(fun place ->
+                    place <> originPlace // ignore the starting place because not moving would be useless
+                    && distanceLessThan origin (placesToCoords place) movementBudgetInHexes) // filter out places that we don't have the budget to reach
                 |> List.sortBy (fun place -> this.HexDistanceSquared (coords, placesToCoords place), this.HexDistanceSquared (origin, placesToCoords place)) // prefer moving as little as possible while getting as hex-close to the target as possible, in part to help surround enemies by not aligning perfectly on 4 sides.
+            let display =
+                candidates |> Array.ofList
+                |> Array.map (fun pl -> pl, placesToCoords pl) |> sprintf "%A"
+            //printfn $"Candidates include: {display}"
             match candidates |> List.tryFind (fun place -> canPlace lhsId (placesToCoords place) this) with
             | Some place ->
                 let coords = placesToCoords place
                 let dist = dist origin coords
-                Some (coords, dist, int dist)
+                Some (coords, dist, Ops.roundUp dist |> int)
             | None ->
                 if radius < movementBudgetInHexes then placeNear coords (radius + 1.<yards>) else None
         placeNear dest (yards 1.)
