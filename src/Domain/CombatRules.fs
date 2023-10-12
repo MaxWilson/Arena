@@ -280,7 +280,7 @@ module ExecuteAction =
                         $"moves a little"
                 cqrsExecute (Logged(MoveTo(me.Id, ctx.geo.Find ctx.me, goalPos, cost, msg)))
                 true
-            | None -> false // if there's no space to move even a little, we'll try again next turn
+            | _ -> false // if there's no space to move even a little, we'll try again next turn
         | _ -> shouldntHappen "We should have already checked move"
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
@@ -288,9 +288,13 @@ module ExecuteAction =
         let rec attempt counter msg (behavior as unchanged) =
             let ctx = getCtx()
 #if DEBUG
-            if counter > 1000 then
+            if counter > 990 then
                 let action = match behavior(feedback, ctx) with | Finished _ -> None | AwaitingAction(a, _) -> Some a
-                shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop. The next action in the behavior would be {action}."
+                if counter > 1000 then
+                    shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop. The next action in the behavior would be {action}."
+                else
+                    printfn $"Action[{ctx.me}, {counter}] = {action}"
+                    printfn $"{ctx.me} is at {ctx.geo.Find ctx.me}"
 #endif
             let attempt = attempt (counter + 1)
             match (behavior(feedback, ctx), ctx.me_) with

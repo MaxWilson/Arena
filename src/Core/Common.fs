@@ -116,6 +116,8 @@ type Polymorphic<'arg, 'result> =
 type Ops =
     static member add(key, value, data: Map<_,_>) = data |> Map.add key value
     static member addTo (data:Map<_,_>) = fun key value -> Ops.add(key, value, data)
+    static member round<[<Measure>]'u>(x: float<'u>): float<'u> = System.Math.Round(float x) |> LanguagePrimitives.FloatWithMeasure
+    static member roundUp<[<Measure>]'u>(x: float<'u>): float<'u> = System.Math.Ceiling(float x) |> LanguagePrimitives.FloatWithMeasure
 
 module String =
     let oxfordJoin = function
@@ -203,17 +205,6 @@ module Map =
     let (|Lookup|_|) key map =
         map |> Map.tryFind key
 
-module Queue =
-    type 't d = 't list
-    let append item queue = queue@[item]
-    let empty = []
-    let read (queue: _ d) = queue
-
-type Ops with
-    static member add(item, data: _ Queue.d) = Queue.append item data
-    static member addTo (data:_ Queue.d) = fun item -> Ops.add(item, data)
-    static member round<[<Measure>]'u>(x: float<'u>): float<'u> = System.Math.Round(float x) |> LanguagePrimitives.FloatWithMeasure
-    static member roundUp<[<Measure>]'u>(x: float<'u>): float<'u> = System.Math.Ceiling(float x) |> LanguagePrimitives.FloatWithMeasure
 // Hit tip to https://gist.github.com/jwosty/5338fce8a6691bbd9f6f
 // and to https://github.com/fsprojects/FSharpx.Extras/blob/da43a30aa1b2a08c86444777a5edb03027cf5c1c/src/FSharpx.Extras/ComputationExpressions/State.fs
 // although I had to fix some bugs with the while loop support.
