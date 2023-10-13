@@ -601,10 +601,10 @@ let View (model: Model) dispatch =
                             | _ ->
                                 Html.div $"Stalemate!"
                             ViewCombat (setup, combat) dispatch
-                        | CalibratedResult(minQuantity, maxQuantity, sampleCombat) ->
-                            let name, min, max = match setup.sideB with Calibrate({ members = Some name, min, max, _}) -> name, min, max | _ -> shouldntHappen()
-                            let min = defaultArg min 50
-                            let max = defaultArg max 90
+                        | CalibratedResult(min, max, sampleCombat) ->
+                            let minQuantity, minPercent = match min with Some (qty, percent) -> Some qty, percent | None -> None, 90
+                            let maxQuantity, maxPercent = match max with Some (qty, percent) -> Some qty, percent | None -> None, 50
+                            let name = match setup.sideB with Calibrate({ members = Some name, _, _, _}) -> name | _ -> shouldntHappen()
                             class' "statistics" Html.div [
                                 let quantityDescription =
                                     match minQuantity, maxQuantity with
@@ -614,7 +614,12 @@ let View (model: Model) dispatch =
                                     | None, Some n -> $"{n} or fewer {db.catalog[name].PluralName_}"
                                     | Some n, Some m -> $"{n} to {m} {db.catalog[name].PluralName_}"
                                     | None, None -> $"an unknown number of {db.catalog[name].PluralName_}"
-                                Html.div $"{setup.sideA |> teamToTxt} wins {min}%%-{max}%% of the time against {quantityDescription}"
+                                let percentDescription =
+                                    match minPercent, maxPercent with
+                                    | n, m when n = m -> $"{n}%%"
+                                    | n, m when n < m -> $"{n}%% to {m}%%"
+                                    | n, m -> $"{m}%% to {n}%%"
+                                Html.div $"{setup.sideA |> teamToTxt} wins {percentDescription} of the time against {quantityDescription}"
                                 ]
                             ViewCombat (setup, sampleCombat) dispatch
                     ]

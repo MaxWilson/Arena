@@ -371,8 +371,9 @@ module Data =
     type AugmentedCombatLog = (Atom option * AugmentedCombat) list
     type CombatLog = (Logged option * Combat) list
 
+    type Percent = float
     type FightResult =
-        | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
+        | CalibratedResult of lower:(int * Percent) option * upper:(int * Percent) option * sample:CombatLog
         | SpecificResult of CombatLog * {| victors: int list |}
 
 

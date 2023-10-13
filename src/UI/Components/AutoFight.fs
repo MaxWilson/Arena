@@ -90,7 +90,7 @@ let findRange evaluate (hardCap: _ option) = async {
         let capped = (match hardCap with Some hardCap -> min hardCap n | None -> n)
         match! evaluate capped with
         | TooLow when hardCap.IsSome && capped = hardCap.Value -> return (hardCap.Value, hardCap.Value) // special case: if we can't go any higher and it's still too low, just return the hardcap.
-        | (TooLow | JustRight) when (hardCap.IsNone || n <= hardCap.Value) -> return! step1 (if n = 1 then 2 else n * 3 / 2) // about a 50% increase each time
+        | (TooLow | JustRight) when (hardCap.IsNone || n <= hardCap.Value) -> return! step1 (if n < 5 then 5 else n * 2) // about a 50% increase each time
         | TooHigh | _ ->
             // then, use binary search to seek both the lower and upper bound
             let rec binarySearch eval (minInclusive, maxInclusive) = async {
@@ -105,8 +105,8 @@ let findRange evaluate (hardCap: _ option) = async {
                     | JustRight -> return mid
                 }
             let rec findLowerBound n = async {
-                let! evalN = evaluate n
                 let! evalJustBelow = evaluate (n-1)
+                let! evalN = evaluate n
                 return
                     match evalN, evalJustBelow with
                     | JustRight, TooLow -> JustRight
@@ -183,16 +183,17 @@ let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, r
         }
 
     let mutable resultsCache = Map.empty
+    let victoryFraction victories = float victories / 10.
     let eval n = async {
-        if resultsCache.ContainsKey n then return resultsCache[n]
-        else
-            let! victories= get n
-            let v =
-                if float victories / 100. < minbound then TooHigh // make it easier, and hard cap at 100 monsters to prevent nontermination
-                elif float victories / 100. > maxbound then TooLow // make it harder
-                else JustRight
-            resultsCache <- resultsCache |> Map.add n v
-            return resultsCache[n]
+        let! victories= if resultsCache.ContainsKey n then async { return resultsCache[n] } else get n
+        let victoryFraction = victoryFraction victories
+        let v =
+            if victoryFraction < minbound then TooHigh // make it easier, and hard cap at 100 monsters to prevent nontermination
+            elif victoryFraction > maxbound then TooLow // make it harder
+            else JustRight
+        if resultsCache.ContainsKey n |> not then
+            resultsCache <- resultsCache |> Map.add n victories
+        return v
         }
     match! findRange eval (Some 100) with
     | min, max ->
@@ -202,7 +203,7 @@ let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, r
             fight cqrs |> ignore
             let sampleFight = cqrs.LogWithMessages()
             loggedOnly sampleFight
-        return Some min, Some max, Some (fightFor max)
+        return Some (min, victoryFraction resultsCache[min] * 100.), Some (max, victoryFraction resultsCache[max] * 100.), Some (fightFor max)
     }
 
 let beginFights (model: Model) dispatch =
@@ -227,7 +228,7 @@ let beginFights (model: Model) dispatch =
                     let max = (defaultArg max 90 |> float) / 100.
                     match! calibrate (Some >> InProgress >> Fighting >> dispatch) model.database.catalog
                             model.fightSetup.sideA
-                            (sideB.center, sideB.radius, name, float min / 100., float max / 100., defeatCriteria) with
+                            (sideB.center, sideB.radius, name, min, max, defeatCriteria) with
                     | minQuantity, maxQuantity, Some sampleMaxFight ->
                         Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fighting |> dispatch
                     | v ->
