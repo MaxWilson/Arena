@@ -33,16 +33,19 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
     potentialTargets
 
 let tryFindTarget (combat: Combat) (attacker: Combatant) =
-    prioritizeTargets combat attacker |> Seq.tryHead
-
+    let potentialTargets = prioritizeTargets combat attacker
+    let target = potentialTargets |> Seq.tryHead
+    target
 let query(f: ActionContext -> _) = QueryRequest f
 let attack details = ReturnAction (Attack details)
 
 let nullBehavior = (behavior { return () })
 
 // move toward is a finite behavior, stops when you get within 1 yard of the target
+let inReach (ctx: ActionContext) targetId = ctx.geo.WithinDistance(ctx.me, targetId, 1.0<yards>)
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
-    let! geo, inReach = query(fun ctx -> ctx.geo, ctx.geo.WithinDistance(ctx.me, targetId, 1.0<yards>))
+    let! geo, inReach = query(fun ctx -> ctx.geo, inReach ctx targetId)
+    let! ctx = query id
     if inReach then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
         return () // done! We're in range, can do something else now.
     else
@@ -54,11 +57,11 @@ let justAttack : ActionBehavior = behavior {
     let rec loop targetId keepMoving = behavior {
         let! target, changed = query(fun ctx ->
             match targetId with
-            | Some targetId ->
+            | Some targetId when inReach ctx targetId ->
                 let target = ctx.combat.combatants[targetId]
                 if target.isnt [Unconscious; Dead] then Some target, false
                 else tryFindTarget ctx.combat ctx.me_, true
-            | None -> tryFindTarget ctx.combat ctx.me_, true
+            | _ -> tryFindTarget ctx.combat ctx.me_, true
             )
         match target with
         | None -> return ()
