@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <PackageReference Include="Expecto" Version="10.*" />
-    <PackageReference Include="Hedgehog" Version="0.13.0" />
     <PackageReference Include="Unquote" Version="6.1.0" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
