@@ -71,7 +71,7 @@ let init () =
         { catalog = UI.LocalStorage.Catalog.read() |> updateWithDefaults }
     let fight = {
         sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Team.fresh
-        sideB = Opposition.calibrated (Some "Orc", None, None, TPK) Team.randomInitialPosition
+        sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Team.randomInitialPosition
         }
     { page = Home; fightSetup = fight; database = db; execution = NotStarted }
 
