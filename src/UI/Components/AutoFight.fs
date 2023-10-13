@@ -87,7 +87,7 @@ type DifficultyGuidance = TooLow | TooHigh | JustRight
 let findRange evaluate (hardCap: _ option) = async {
     // first, look for a bound on the *upper* bound
     let rec step1 n = async {
-        match! evaluate n with
+        match! evaluate (match hardCap with Some hardCap -> min hardCap n | None -> n) with
         | (TooLow | JustRight) when (hardCap.IsNone || n <= hardCap.Value) -> return! step1 (if n = 1 then 2 else n * 3 / 2) // about a 50% increase each time
         | TooHigh | _ ->
             let range = match hardCap with Some hardCap when n > hardCap -> (1, hardCap) | _ -> (1, n)
