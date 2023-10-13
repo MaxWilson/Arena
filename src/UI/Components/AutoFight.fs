@@ -87,10 +87,11 @@ type DifficultyGuidance = TooLow | TooHigh | JustRight
 let findRange evaluate (hardCap: _ option) = async {
     // first, look for a bound on the *upper* bound
     let rec step1 n = async {
-        match! evaluate (match hardCap with Some hardCap -> min hardCap n | None -> n) with
+        let capped = (match hardCap with Some hardCap -> min hardCap n | None -> n)
+        match! evaluate capped with
+        | TooLow when hardCap.IsSome && capped = hardCap.Value -> return (hardCap.Value, hardCap.Value) // special case: if we can't go any higher and it's still too low, just return the hardcap.
         | (TooLow | JustRight) when (hardCap.IsNone || n <= hardCap.Value) -> return! step1 (if n = 1 then 2 else n * 3 / 2) // about a 50% increase each time
         | TooHigh | _ ->
-            let range = match hardCap with Some hardCap when n > hardCap -> (1, hardCap) | _ -> (1, n)
             // then, use binary search to seek both the lower and upper bound
             let rec binarySearch eval (minInclusive, maxInclusive) = async {
                 let mid = (minInclusive + maxInclusive) / 2
@@ -125,9 +126,17 @@ let findRange evaluate (hardCap: _ option) = async {
                     | JustRight, JustRight -> TooLow // go higher until you find a JustRight/TooHigh pair.
                     | JustRight, TooLow -> TooLow // Note: JustRight/TooLow doesn't make sense but could happen anyway if eval is noisy.
                 }
-            let! lower = binarySearch findLowerBound range
-            let! upper = binarySearch findUpperBound range
-            return lower, upper
+            match hardCap with
+            | Some hardCap when n > hardCap ->
+                let range = (1, hardCap)
+                let upper = hardCap
+                let! lower = binarySearch findLowerBound range
+                return lower, upper
+            | _ ->
+                let range = (1, n)
+                let! lower = binarySearch findLowerBound range
+                let! upper = binarySearch findUpperBound range
+                return lower, upper
         }
     return! step1 1
     }
