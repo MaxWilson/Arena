@@ -9,7 +9,7 @@ let shouldFail = Swensen.Unquote.Assertions.raises
 
 // Slightly simpler version of DefenseDetails to make test output easier to read
 type DefenseResult = { defense: DefenseType; targetRetreated: bool }
-    with static member create (targetNumber, input: DefenseDetails) = targetNumber, { defense = input.defense; targetRetreated = input.retreatFrom.IsSome }
+    with static member create (targetNumber, input: DefenseDetails) = targetNumber, { defense = input.defense; targetRetreated = input.retreating.IsSome }
 
 [<Tests>]
 let Tests = testLabel "Unit" <| testList "Rules" [
@@ -30,9 +30,12 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let previousAttacker = Combatant.fresh(2, "Ogre 1", 1, Creature.create "Ogre 1")
         let attacker = Combatant.fresh(2, "Ogre 2", 2, Creature.create "Ogre 2")
         let gunman = Combatant.fresh(2, "Gunman", 3, { Creature.create "Gunman" with CannotBeParried = true })
+        let nowhere = coords (0., 0.)
+        let geo = Geo.ofList [(1, "test1"), coords(0., 0.); previousAttacker.Id, coords (1., 0.); attacker.Id, coords(0., 1.); gunman.Id, coords(1., 1.)]
+        let chooseDefense = chooseDefense geo
         let create dodge parry block retreatUsed =
             let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
-            { Combatant.fresh(1, "test1", 1, stats) with retreatFrom = if retreatUsed then Some previousAttacker.Id else None }
+            { Combatant.fresh(1, "test1", 1, stats) with retreating = if retreatUsed then Some (previousAttacker.Id, nowhere) else None }
         let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
             let combatant = { combatant with parriesUsed = parriesUsed; stats = f combatant.stats }
@@ -45,7 +48,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             let combatant = { create dodge parry block retreat with statusMods = conditions; injuryTaken = damage }
             chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefenseWithPriorRetreat dodge parry block previousRetreat =
-            let combatant = { create dodge parry block false with retreatFrom = Some previousRetreat }
+            let combatant = { create dodge parry block false with retreating = Some (previousRetreat, nowhere) }
             chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefenseFromGunman dodge parry block retreat =
             let combatant = create dodge parry block retreat
@@ -114,7 +117,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
                 create "Badly Hurt Guy" 13 []
                 create "Dying Guy" 22 [Unconscious]
                 ]
-            |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; geo = Geo.ofList [for ix, c in guys |> List.mapi Tuple2.create -> c.Id, coords (float ix*2., 0.)] }
+            |> fun guys -> { Combat.fresh with combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList; geo = Geo.ofList [for ix, c in guys |> List.mapi Tuple2.create -> c.Id, coords (float ix*2., 0.)] }
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
                     = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Stunned Dying Guy"; "Badly Hurt Guy"; ] @>
@@ -161,8 +164,9 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let bob = Combatant.fresh(1, "Bob", 1, Creature.create "Bob")
         let cqrs =
             let combat =
-                {   combatants = [alice; bob] |> List.map (fun c -> c.Id, c) |> Map.ofList
-                    geo = Geo.ofList [alice.Id, coords (0., 0.); bob.Id, coords (0., 2.)]
+                {   Combat.fresh with
+                        combatants = [alice; bob] |> List.map (fun c -> c.Id, c) |> Map.ofList
+                        geo = Geo.ofList [alice.Id, coords (0., 0.); bob.Id, coords (0., 2.)]
                 }
             CQRS.CQRS.create(combat, CombatAtom.updateCombat)
         let (goalPos, dist, cost) = cqrs.State.geo |> Geo.tryApproach (bob.Id, Place (coords (2., 0.)), 4) |> Option.get

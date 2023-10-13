@@ -12,6 +12,42 @@ let verify = Swensen.Unquote.Assertions.test
 
 [<Tests>]
 let Tests = testLabel "Unit" <| testList "Behavior" [
+    testCase "Sanity check behavior composition" <| fun () ->
+        // A simple behavior: always returns its context + 1. This very predictable behavior lets us
+        // sanity-check that we're getting the ctx we expect.
+        let rec incrementBehavior: Behavior<int,unit,int,_> = behavior {
+            let! ctx = QueryRequest id
+            let! feedback, ctx' = ReturnAction(ctx + 1)
+            return! incrementBehavior
+            }
+        // wrapper around a simple behavior that just keeps it running forever unless it gets a signal to stop
+        let rec triggerlistener stopTrigger wrapped: Behavior<int,unit,int,string> = behavior {
+            let! ctx = QueryRequest id
+            match stopTrigger ctx with
+            | Some result ->
+                return result
+            | None ->
+                match! run wrapped ((), ctx) with
+                | Ready result -> return result
+                | Resume followup ->
+                    return! triggerlistener stopTrigger followup
+            }
+
+        let mutable bhv = triggerlistener (function 42 -> Some "OK" | _ -> None) incrementBehavior
+        let getAction = function AwaitingAction(action, nextBehavior) -> action, nextBehavior | v -> matchfail v
+        let run n =
+            let action, followup = run bhv ((), n) |> getAction
+            bhv <- followup
+            action
+        let runFinal n =
+            match bhv ((), n) with
+            | Finished result -> result
+            | v -> matchfail v
+        verify <@ run 1 = 2 @>
+        verify <@ run 2 = 3 @>
+        verify <@ run 10 = 11 @>
+        verify <@ run 6 = 7 @>
+        verify <@ runFinal 42 = "OK" @>
     testCase "Cowardly should flee when damaged" <| fun () ->
         let rec fakeFlee: ActionBehavior = behavior {
             let! (feedback: unit), (ctx: ActionContext) = ReturnAction(Move(Place(10000.<yards>,0.<yards>)))

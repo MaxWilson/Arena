@@ -250,7 +250,7 @@ module Data =
         injuryTaken: int
         shockPenalty: int
         statusMods: Status list
-        retreatFrom: CombatantId option
+        retreating: (CombatantId * Coords) option
         blockUsed: bool
         parriesUsed: int
         maneuverBudget: int // use maneuvers to get movement and attacks
@@ -270,7 +270,7 @@ module Data =
                 injuryTaken = 0
                 shockPenalty = 0
                 statusMods = if stats.Berserk = Some Always then [Berserk] else []
-                retreatFrom = None
+                retreating = None
                 blockUsed = false
                 parriesUsed = 0
                 maneuverBudget = 1
@@ -286,7 +286,7 @@ module Data =
         static member newTurn (combatant: Combatant) =
             { combatant
                 with
-                retreatFrom = None
+                retreating = None
                 blockUsed = false
                 parriesUsed = 0
                 maneuverBudget = 1 + combatant.stats.AlteredTimeRate_
@@ -305,10 +305,13 @@ module Data =
         lookup: Map<CombatantId, Coords>
         obstructions: Map<(int * int), CombatantId>
         }
+        with static member fresh = { lookup = Map.empty; obstructions = Map.empty }
     type Combat = {
+        round: int
         combatants: Map<CombatantId, Combatant>
         geo: Geo2d
         }
+        with static member fresh = { round = 1; combatants = Map.empty; geo = Geo2d.fresh }
     type ActionContext = { me: CombatantId; combat: Combat; } with
         member this.me_ = this.combat.combatants.[this.me]
         member this.geo = this.combat.geo
@@ -326,8 +329,8 @@ module Data =
         member this.Target_ = snd this.target
         member this.TargetTeam_ = fst this.target
     type DefenseType = Parry | Block | Dodge
-    type DefenseDetails = { defense: DefenseType; retreatFrom: CombatantId option }
-        with member this.targetRetreated = this.retreatFrom.IsSome
+    type DefenseDetails = { defense: DefenseType; retreating: (CombatantId * Coords) option }
+        with member this.targetRetreated = this.retreating.IsSome
     type Outcome = CritSuccess of int | Success of int | CritFail of int | Fail of int
     type 'members GroupSetup = {
         members: 'members
@@ -398,14 +401,17 @@ module Resourcing =
         | ConsumeManeuver c -> Some(c.movementBudget + c.stats.Move_, c)
         | _ -> None
     let (|ConsumeDefense|_|) (defense: DefenseDetails option) (c: Combatant) =
-        match c.retreatFrom, defense with
-        | Some r, Some { retreatFrom = Some r' } when r <> r' -> None // can't retreat twice from two different enemies in the same turn
+        match c.retreating, defense with
+        | Some (from, unto), Some { retreating = Some (attacker, _) } when from <> attacker -> None // can't retreat twice from two different enemies in the same turn
         | _, None -> Some c // no defense = nothing to consume
-        | _, Some ({ retreatFrom = r' } as defense) ->
+        | _, Some ({ retreating = retreat } as defense) ->
+            if retreat.IsSome && c.retreating.IsSome && retreat <> c.retreating then
+                shouldntHappen "We shouldn't be able to retreat twice from different opponents in one round"
+            let retreat' = c.retreating |> Option.orElse retreat // preserve retreat if there already is one, otherwise
             match defense.defense with
-            | Parry -> Some { c with parriesUsed = c.parriesUsed + 1; retreatFrom = r' }
-            | Block when (not c.blockUsed) -> Some { c with blockUsed = true; retreatFrom = r' }
-            | Dodge -> Some { c with retreatFrom = r' }
+            | Parry -> Some { c with parriesUsed = c.parriesUsed + 1; retreating = retreat' }
+            | Block when (not c.blockUsed) -> Some { c with blockUsed = true; retreating = retreat' }
+            | Dodge -> Some { c with retreating = retreat' }
             | _ -> None // illegal defense, probably a double block
 
 #nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing

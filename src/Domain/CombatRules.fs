@@ -14,9 +14,13 @@ module CombatAtom =
         let illegal() = shouldntHappen "An illegal resource consumption was specified. This should already have been prevented between behavior and execution, by blocking during the iterateBehavior phase."
         let updateCombatantWith (|Pattern|_|) id =
             updateCombatant id (function Pattern c -> c | _ -> illegal())
+        let place id dest model = { model with geo = model.geo |> Geo.place id dest }
+        let consumeMovement mv id = updateCombatant id (function AvailableMove(moves, c) -> { c with movementBudget = moves - mv } | _ -> illegal())
+        let applyRetreatMovement id (defense: DefenseDetails option) model =
+            match defense with Some { retreating = Some (_, dest) } -> model |> place id dest | _ -> model
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatantWith ((|ConsumeDefense|_|) defense) id
-        let consumeMovement mv id = updateCombatant id (function AvailableMove(moves, c) -> { c with movementBudget = moves - mv } | _ -> illegal())
+            >> applyRetreatMovement id defense
         let takeDamage (id: CombatantId) amount conditions combat =
             let combat = combat |> updateCombatant id (fun c ->
                 let goingBerserk = conditions |> List.contains Berserk
@@ -57,9 +61,8 @@ module CombatAtom =
                 |> updateCombatant id (fun c ->
                     { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
         | Info (id, _, _) -> model
-        | NewRound _ -> model
+        | NewRound n -> { model with round = n }
         | MoveTo (id, _, dest, mv, _) ->
-            let place id dest model = { model with geo = model.geo |> Geo.place id dest }
             (consumeMovement mv id model) |> place id dest
     let update msg model =
         match msg with
@@ -80,40 +83,46 @@ let successTest target x =
     elif x <= 4 then CritSuccess ((min target 4) - x)
     else Success (target - x)
 
-let chooseDefense (attacker: Combatant) (victim: Combatant) =
+let chooseDefense (geo: Geo2d) (attacker: Combatant) (victim: Combatant) =
     let attackerId = attacker.Id
-    let canRetreat =
-        (not <| victim.isAny [Dead; Unconscious; Stunned] )
-        && (
-        match victim.retreatFrom with
-        | Some id when id = attackerId -> true
-        | None -> true
-        | _ -> false)
+    let retreat =
+        if victim.isAny [Dead; Unconscious; Stunned] then None
+        else
+            match victim.retreating with
+            | Some (id, dest) when id = attackerId -> Some(id, dest)
+            | Some _ -> None
+            | None ->
+                match geo.TryAwayFrom(victim.Id, Person attacker.Id, 1) with // TODO: retreat step, not just movement
+                | Some(dest, dist, cost) ->
+                    Some(attackerId, dest)
+                | _ -> None
     let (|Parry|_|) = function
         | Some parry when not attacker.stats.CannotBeParried ->
             let parry = (parry - (match victim.stats.WeaponMaster, victim.stats.FencingParry with | true, true -> 1 | true, false | false, true -> 2 | otherwise -> 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, Some attackerId else parry, None)
+            Some(if retreat.IsSome then (if victim.stats.FencingParry then 3 else 1) + parry else parry)
         | _ -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
-            Some(if canRetreat then 1 + block, Some attackerId else block, None)
+            Some(if retreat.IsSome then 1 + block else block)
         | _ -> None
-    let dodge, retreat =
+    let dodge =
         let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
                     then victim.stats.Dodge_
                     else victim.stats.Dodge_ / 2
-        if canRetreat then 3 + dodge, Some attackerId else dodge, None
+        if retreat.IsSome then 3 + dodge else dodge
     let target, defense =
+        let defenseOf defense =
+            { defense = defense; retreating = retreat }
         match victim.stats.Parry, victim.stats.Block with
-        | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
+        | Parry (parry), Block (block) when parry >= block && parry >= dodge ->
             // I guess we'll use parry in this case because we have to pick something
-            parry, { defense = Parry; retreatFrom = retreat }
-        | _, Block (block, retreat) when block >= dodge ->
-            block, { defense = Block; retreatFrom = retreat }
-        | Parry (parry, retreat), _ when parry >= dodge ->
-            parry, { defense = Parry; retreatFrom = retreat }
+            parry, defenseOf Parry
+        | _, Block (block) when block >= dodge ->
+            block, defenseOf Block
+        | Parry (parry), _ when parry >= dodge ->
+            parry, defenseOf Parry
         | _ ->
-            dodge, { defense = Dodge; retreatFrom = retreat }
+            dodge, defenseOf Dodge
     let target =
         target
         + (if victim.is Stunned then -4 else 0)
@@ -190,7 +199,7 @@ module ExecuteAction =
             | n -> n, 0
         match detailedAttempt "Attack" skill with
         | (Success _ | CritSuccess _) as success ->
-            let defenseTarget, defense = chooseDefense attacker victim
+            let defenseTarget, defense = chooseDefense ctx.geo attacker victim
             let defenseLabel =
                 (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                 + (if defense.targetRetreated then " and retreat" else "")
@@ -433,8 +442,9 @@ let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
     let behaviors = setup |> List.map (fun (c, _) -> c.Id, justAttack) |> Map.ofList
     {   combat =
-            {   combatants = combatants
-                geo = geo
+            {   Combat.fresh with
+                    combatants = combatants
+                    geo = geo
             }
         behaviors = behaviors
         }

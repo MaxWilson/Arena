@@ -16,7 +16,7 @@ type BehaviorBuilder() =
     // member this.Bind(b, f) = bind b f
     member this.Bind(ReturnAction(action), binder: _ -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
         fun (feedback, context) ->
-            let followupRoutine = binder (feedback, context)
+            let followupRoutine() = binder (feedback, context)
             (* consider a block of behavior that looks like this:
 
                let! feedback, context = ReturnAction(SimpleAttack)
@@ -31,7 +31,7 @@ type BehaviorBuilder() =
                because mem and action are outputs whereas feedback and context are inputs.
             *)
             // previously, // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-            AwaitingAction(action, run followupRoutine)
+            AwaitingAction(action, fun (feedback', ctx') -> followupRoutine() (feedback', ctx'))
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>) =
         fun(feedback, ctx) ->
             let (QueryRequest qf) = q
@@ -42,7 +42,7 @@ type BehaviorBuilder() =
             // when you do let! x = run (child) in ... you should get back either a Ready finalResult or a Resume behavior which continues the child. You can choose whether to actually resume it or switch to a different behavior.
             match childResult with
             | AwaitingAction(action, resume) ->
-                AwaitingAction(action, binder (Resume resume))
+                AwaitingAction(action, fun (feedback, ctx) -> binder (Resume resume) (feedback, ctx))
             | Finished result ->
                 binder (Ready result)(feedback, ctx)
     (*

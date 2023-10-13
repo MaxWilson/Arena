@@ -138,15 +138,8 @@ type Geo2d with
     member this.HexDistanceSquared(lhsPos, rhsId) = hexDistSquared lhsPos (this.Find rhsId)
     member this.LineFrom (lhsPos: Coords, rhsPos: Coords) = Line(lhsPos, rhsPos)
     member this.LineFrom (lhsId, rhsId) = Line(this.Find lhsId, this.Find rhsId)
-    member this.TryApproach (lhsId, dest: Destination, movementBudget: int) : (Coords * float<yards> * int) option =
-        let movementBudgetInHexes = float movementBudget * 1.<yards>
-        let line =
-            match dest with
-            | Person dest -> this.LineFrom(lhsId, dest)
-            | Place dest -> this.LineFrom(this.Find lhsId, dest)
-        let origin = line.Origin
+    member this.TryMoveTo(lhsId: CombatantId, origin: Coords, dest: Coords, movementBudgetInHexes) =
         let originPlace = placeOf origin
-        let dest = line.Extend (min line.Length movementBudgetInHexes)
         let rec placeNear dest radius =
             let candidates =
                 placesNear dest radius
@@ -167,6 +160,24 @@ type Geo2d with
             | None ->
                 if radius < movementBudgetInHexes then placeNear dest (radius + 1.<yards>) else None
         placeNear dest (yards 1.)
+    member this.TryApproach (lhsId, dest: Destination, movementBudget: int) : (Coords * float<yards> * int) option =
+        let line =
+            match dest with
+            | Person dest -> this.LineFrom(lhsId, dest)
+            | Place dest -> this.LineFrom(this.Find lhsId, dest)
+        let origin = line.Origin
+        let movementBudgetInHexes = float movementBudget * 1.<yards>
+        let dest = line.Extend (min line.Length movementBudgetInHexes)
+        this.TryMoveTo(lhsId, origin, dest, movementBudgetInHexes)
+    member this.TryAwayFrom (lhsId, dest, movementBudget) : (Coords * float<yards> * int) option  =
+        let line =
+            match dest with
+            | Person dest -> this.LineFrom(lhsId, dest)
+            | Place dest -> this.LineFrom(this.Find lhsId, dest)
+        let origin = line.Origin
+        let movementBudgetInHexes = float movementBudget * 1.<yards>
+        let dest = line.Extend -(min line.Length movementBudgetInHexes)
+        this.TryMoveTo(lhsId, origin, dest, movementBudgetInHexes)
 
     // leave combatantId in lookup so it can be displayed, but remove it from obstructions
     member this.RemoveObstruction combatantId =
