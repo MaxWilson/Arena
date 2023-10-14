@@ -294,11 +294,11 @@ module ExecuteAction =
 
     let rec iterateBehavior msg (cqrsExecute: _ -> unit) (getCtx: unit -> ActionContext) (behavior: ActionBehavior) : ActionBehavior option =
         let feedback = () // feedback will probably be more than just unit eventually, after we have our log system in place
-        let rec attempt counter msg (behavior as unchanged) =
+        let rec attempt counter msg (behavior: ActionBehavior as unchanged) =
             let ctx = getCtx()
 #if DEBUG
             if counter > 990 then
-                let action = match behavior(feedback, ctx) with | Finished _ -> None | AwaitingAction(a, _) -> Some a
+                let action = match run behavior (feedback, ctx) with | Finished _ -> None | AwaitingAction(a, _) -> Some a
                 if counter > 1000 then
                     shouldntHappen $"Behavior count is absurdly high. {ctx.me} is probably stuck in an infinite loop. The next action in the behavior would be {action}."
                 else
@@ -306,10 +306,10 @@ module ExecuteAction =
                     devLog $"{ctx.me} is at {ctx.geo.Find ctx.me}"
 #endif
             let attempt = attempt (counter + 1)
-            match (behavior(feedback, ctx), ctx.me_) with
+            match (run behavior (feedback, ctx), ctx.me_) with
             | Finished (), _ -> None
             | AwaitingAction(Yield, behavior), _ -> Some behavior // always retry a yield at the start of a new turn/loop but never after that, since "end my turn" is exactly what Yield means.
-            | AwaitingAction(Attack({ rapidStrike = true } as details), followup), ConsumeRapidStrike me -> // rapid strikes cost less than regular attacks
+            | AwaitingAction(Attack({ rapidStrike = true } as details), followup: ActionBehavior), ConsumeRapidStrike me -> // rapid strikes cost less than regular attacks
                 doAttack msg cqrsExecute ctx details
                 attempt "" followup
             | AwaitingAction(Attack(details), followup), ConsumeAttack me -> // NOT a rapid strike because we can't afford one

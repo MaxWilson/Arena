@@ -40,7 +40,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
             bhv <- followup
             action
         let runFinal n =
-            match bhv ((), n) with
+            match Coroutine.run bhv ((), n) with
             | Finished result -> result
             | v -> matchfail v
         verify <@ run 1 = 2 @>
