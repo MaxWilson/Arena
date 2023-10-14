@@ -10,40 +10,50 @@ let inline run logic (feedback, ctx) =
     logic(feedback, ctx)
 
 type BehaviorBuilder() =
-    member this.Delay f = f
-    member this.Run b = fun (feedback, ctx) -> b()(feedback, ctx)
-    member this.Return (x: 't) : Behavior<_,_,_,_> = fun (feedback, ctx) -> Finished x
+    member this.Delay expressionThunk = expressionThunk
+    member this.Run (b:unit -> Behavior<_,_,_,_>) = fun (feedback, ctx) -> b()(feedback, ctx)
+    member this.Run (b:unit -> ExecutionResult<_,_,_,_>) = fun (feedback, ctx) -> b()
+    member this.Return (x: 't) : ExecutionResult<_,_,_,_> = Finished x
     member this.ReturnFrom (x: Behavior<_,_,_,_>) = x
     // member this.Bind(b, f) = bind b f
-    member this.Bind(ReturnAction(action), binder: _ -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
-        fun (feedback, context) ->
-            (* consider a block of behavior that looks like this:
+    member this.Bind(ReturnAction(action), binder: Behavior<_,_,_,_>): ExecutionResult<_,_,_,_> =
+        (* consider a block of behavior that looks like this:
 
-               let! feedback, context = ReturnAction(SimpleAttack)
-               return if feedback > 0 then Success else Failure
+            let! feedback, context = ReturnAction(SimpleAttack)
+            return if feedback > 0 then Success else Failure
 
-               From the caller's perspective, this looks like two separate, nested behaviors
+            From the caller's perspective, this looks like two separate, nested behaviors
 
-               let AwaitingAction(action1, continuation) = behavior(...) // this is the ReturnAction
-               let Finished Failure = continuation (feedback, context) // Here's where we consume feedback and evaluate it to produce a result.
+            let AwaitingAction(action1, continuation) = behavior(...) // this is the ReturnAction
+            let Finished Failure = continuation (feedback, context) // Here's where we consume feedback and evaluate it to produce a result.
 
-               So even though it LOOKS at first like it's weird for feedback and context to get fed to followupBehavior, it actually makes sense
-               because mem and action are outputs whereas feedback and context are inputs.
-            *)
-            // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-            AwaitingAction(action, fun (feedback', context') ->
-                printfn $"Binding to {(feedback', context')} twice"
-                binder (feedback', context')(feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
+            So even though it LOOKS at first like it's weird for feedback and context to get fed to followupBehavior, it actually makes sense
+            because mem and action are outputs whereas feedback and context are inputs.
+        *)
+        // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
+        AwaitingAction(action, fun (feedback', context') ->
+            printfn $"Binding to {(feedback', context')} twice"
+            binder (feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>) =
         fun(feedback, ctx) ->
             let (QueryRequest qf) = q
             let r = qf ctx
             run (binder r) (feedback, ctx)
+    member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> ExecutionResult<_,_,_,_>) =
+        fun(feedback, ctx) ->
+            let (QueryRequest qf) = q
+            let r = qf ctx
+            binder r
     member this.Bind(q: QueryFeedback<_,'result>, binder: 'result -> Behavior<_,_,_,_>) =
         fun(feedback, ctx) ->
             let (QueryFeedback qf) = q
             let r = qf feedback
             run (binder r) (feedback, ctx)
+    member this.Bind(q: QueryFeedback<'feedback,'result>, binder: 'result -> ExecutionResult<_,_,_,_>): Behavior<'action,'feedback,'ctx,'finalResult> =
+        fun(feedback: 'feedback, ctx) ->
+            let (QueryFeedback qf) = q
+            let r = qf feedback
+            binder r
     member this.Bind(childResult: ExecutionResult<_,_,_,_>, binder: ChildResult<_,_,_,_> -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
         fun(feedback, ctx) ->
             // when you do let! x = run (child) in ... you should get back either a Ready finalResult or a Resume behavior which continues the child. You can choose whether to actually resume it or switch to a different behavior.
@@ -95,19 +105,36 @@ let (AwaitingAction(action, followup)) = smokeTest(3, ())
 let (AwaitingAction(action, followup)) = followup(2, ())
 let (Finished action) = followup(1, ())
 
+let smoke2_a: Behavior<int,unit,int,int> =
+    let b = behavior
+    b.Run(b.Delay(fun () -> b.Bind(ReturnAction 4, fun ((), ctx) -> b.Return ctx))) // note! we're not just using bind, we're applying it to (), ctx! The F# builder doesn't do this automatically. How can we force it to?
 let smoke2: Behavior<int,unit,int,int> =
     let b = behavior
-    b.Bind(ReturnAction 4, fun ((), ctx) -> b.Bind(ReturnAction ctx, fun ((), ctx) -> b.Return ctx))
+    let delayed = b.Delay(fun () -> b.Return 4)
+    let run = b.Run delayed
+    let compare = behavior {
+        let! feedback, ctx = ReturnAction 4
+        let! feedback, ctx = ReturnAction ctx
+        return ctx
+        }
+    b.Run(b.Delay(fun () -> b.Bind(ReturnAction 4, fun ((), ctx) -> b.Bind(ReturnAction ctx, fun ((), ctx) -> b.Return ctx)))) // note! we're not just using bind, we're applying it to (), ctx! The F# builder doesn't do this automatically. How can we force it to?
 
 let smoke3 =
-    let inline bind (ReturnAction(action), binder: _ -> Behavior<_,_,_,_>) : Behavior<_,_,_,_>=
-        fun (feedback, context) ->
-            printfn $"Ignoring {(feedback, context)} to return {action}"
-            // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-            AwaitingAction(action, fun (feedback', context') ->
-                printfn $"Binding to {(feedback', context')} twice"
-                binder (feedback, context)(feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
-    bind(ReturnAction 4, fun ((), ctx) -> bind(ReturnAction ctx, fun ((), ctx) -> (fun (_, _) -> Finished ctx)))
+    let inline bind (ReturnAction(action), binder: Behavior<_,_,_,_>) : ExecutionResult<_,_,_,_> =
+        // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
+        AwaitingAction(action, fun (feedback', context') ->
+            printfn $"Binding to {(feedback', context')} twice"
+            binder (feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
+    let smoke3a = bind(ReturnAction 4, fun ((), ctx) -> Finished ctx)
+    let b = behavior
+    b.Run(b.Delay(fun () -> bind(ReturnAction 4, fun ((), ctx) ->
+        //let feedback, context = ((), ctx)
+        let (ReturnAction(action)) = (ReturnAction ctx)
+        let binder = fun ((), ctx) -> Finished ctx
+        AwaitingAction(action, fun (feedback', context') ->
+            printfn $"Binding to {(feedback', context')} twice"
+            binder (feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
+        )))
 
 let (AwaitingAction(action, followup)) = smoke2((), 1)
 let (AwaitingAction(action, followup)) = followup((), 2)
