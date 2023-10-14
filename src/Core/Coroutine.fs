@@ -100,7 +100,6 @@ let smoke2: Behavior<int,unit,int,int> =
     b.Bind(ReturnAction 4, fun ((), ctx) -> b.Bind(ReturnAction ctx, fun ((), ctx) -> b.Return ctx))
 
 let smoke3 =
-    let b = behavior
     let inline bind (ReturnAction(action), binder: _ -> Behavior<_,_,_,_>) : Behavior<_,_,_,_>=
         fun (feedback, context) ->
             printfn $"Ignoring {(feedback, context)} to return {action}"
