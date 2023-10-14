@@ -108,7 +108,7 @@ let smoke3 =
             AwaitingAction(action, fun (feedback', context') ->
                 printfn $"Binding to {(feedback', context')} twice"
                 binder (feedback, context)(feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
-    bind(ReturnAction 4, fun ((), ctx) -> bind(ReturnAction ctx, fun ((), ctx) -> b.Return ctx))
+    bind(ReturnAction 4, fun ((), ctx) -> bind(ReturnAction ctx, fun ((), ctx) -> (fun (_, _) -> Finished ctx)))
 
 let (AwaitingAction(action, followup)) = smoke2((), 1)
 let (AwaitingAction(action, followup)) = followup((), 2)
