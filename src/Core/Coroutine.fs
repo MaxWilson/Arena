@@ -119,6 +119,9 @@ let smoke2: Behavior<int,unit,int,int> =
         }
     b.Run(b.Delay(fun () -> b.Bind(ReturnAction 4, fun ((), ctx) -> b.Bind(ReturnAction ctx, fun ((), ctx) -> b.Return ctx)))) // note! we're not just using bind, we're applying it to (), ctx! The F# builder doesn't do this automatically. How can we force it to?
 
+let (AwaitingAction(action, followup)) = smoke2((), 1)
+let (AwaitingAction(action, followup)) = followup((), 2)
+
 let smoke3 =
     let inline bind (ReturnAction(action), binder: Behavior<_,_,_,_>) : ExecutionResult<_,_,_,_> =
         // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
@@ -135,9 +138,6 @@ let smoke3 =
             printfn $"Binding to {(feedback', context')} twice"
             binder (feedback', context')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
         )))
-
-let (AwaitingAction(action, followup)) = smoke2((), 1)
-let (AwaitingAction(action, followup)) = followup((), 2)
 let (AwaitingAction(action, followup)) = smoke3((), 1)
 let (AwaitingAction(action, followup)) = followup((), 2)
 
