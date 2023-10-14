@@ -16,7 +16,6 @@ type BehaviorBuilder() =
     // member this.Bind(b, f) = bind b f
     member this.Bind(ReturnAction(action), binder: _ -> Behavior<_,_,_,_>): Behavior<_,_,_,_> =
         fun (feedback, context) ->
-            let followupRoutine() = binder (feedback, context)
             (* consider a block of behavior that looks like this:
 
                let! feedback, context = ReturnAction(SimpleAttack)
@@ -30,8 +29,8 @@ type BehaviorBuilder() =
                So even though it LOOKS at first like it's weird for feedback and context to get fed to followupBehavior, it actually makes sense
                because mem and action are outputs whereas feedback and context are inputs.
             *)
-            // previously, // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-            AwaitingAction(action, fun (feedback', ctx') -> followupRoutine() (feedback', ctx'))
+            // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
+            AwaitingAction(action, fun (feedback', ctx') -> binder (feedback', ctx') (feedback', ctx')) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>) =
         fun(feedback, ctx) ->
             let (QueryRequest qf) = q
@@ -42,7 +41,7 @@ type BehaviorBuilder() =
             // when you do let! x = run (child) in ... you should get back either a Ready finalResult or a Resume behavior which continues the child. You can choose whether to actually resume it or switch to a different behavior.
             match childResult with
             | AwaitingAction(action, resume) ->
-                AwaitingAction(action, fun (feedback, ctx) -> binder (Resume resume) (feedback, ctx))
+                AwaitingAction(action, fun feedbackCtx -> binder (Resume resume) feedbackCtx)
             | Finished result ->
                 binder (Ready result)(feedback, ctx)
     (*
