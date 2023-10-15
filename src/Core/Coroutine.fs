@@ -35,7 +35,7 @@ type BehaviorBuilder() =
         *)
         // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
         Parameterized(fun (feedback, ctx) ->
-            AwaitingAction(action, binder (feedback, ctx))
+            AwaitingAction(action, Parameterized <| fun (feedback, ctx) -> run (binder (feedback, ctx)) (feedback, ctx))
             ) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>): Behavior<'action,'feedback,'ctx,'finalResult>  =
         fun(feedback, ctx) ->
