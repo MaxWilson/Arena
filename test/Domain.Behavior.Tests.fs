@@ -105,6 +105,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
             match run BobsBhv ((), toCtx combat) with
             | Finished () -> failwith "Bob should always be either attacking or fleeing until his opponent dies, which shouldn't happen in this test."
             | AwaitingAction(action, nextBehavior) ->
+                printfn "Received action %A" action
                 BobsBhv <- nextBehavior
                 // we don't actually DO the action in this test but we verify that it's an attack on the other Bob
                 verify <@ expected = action @>
