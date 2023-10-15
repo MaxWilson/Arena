@@ -34,20 +34,31 @@ type BehaviorBuilder() =
             because mem and action are outputs whereas feedback and context are inputs.
         *)
         // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-        Parameterized(fun (feedback, ctx) ->
-            AwaitingAction(action, Parameterized <| fun (feedback, ctx) -> run (binder (feedback, ctx)) (feedback, ctx))
-            ) // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
+        fun (feedback, ctx) ->
+            AwaitingAction(action,
+                fun (feedback, ctx) ->
+                    match binder (feedback, ctx) with
+                    | Absolute logic -> logic() // promote absolute to parameterized behavior
+                    | Parameterized logic -> logic(feedback, ctx)
+                |> Parameterized
+                )
+            // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
+        |> Parameterized
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>): Behavior<'action,'feedback,'ctx,'finalResult>  =
         fun(feedback, ctx) ->
             let (QueryRequest qf) = q
             let r = qf ctx
-            run (binder r) (feedback, ctx)
+            match binder r with
+            | Absolute logic -> logic() // promote absolute to parameterized behavior
+            | Parameterized logic -> logic(feedback, ctx)
         |> Parameterized
     member this.Bind(q: QueryFeedback<'feedback,'result>, binder: 'result -> Behavior<_,_,_,_>): Behavior<'action,'feedback,'ctx,'finalResult> =
         fun(feedback: 'feedback, ctx) ->
             let (QueryFeedback qf) = q
             let r = qf feedback
-            run (binder r) (feedback, ctx)
+            match binder r with
+            | Absolute logic -> logic() // promote absolute to parameterized behavior
+            | Parameterized logic -> logic(feedback, ctx)
         |> Parameterized
     member this.Bind(childResult: ExecutionResult<_,_,_,_>, binder: ChildResult<_,_,_,_> -> Behavior<_,_,_,_>) =
         // when you do let! x = run (child) in ... you should get back either a Ready finalResult or a Resume behavior which continues the child. You can choose whether to actually resume it or switch to a different behavior.
