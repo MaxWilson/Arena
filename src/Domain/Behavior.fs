@@ -3,8 +3,6 @@ module Domain.Behavior
 open Coroutine
 open Domain.Geo
 
-let behavior = BehaviorBuilder()
-
 let prioritizeTargets (combat: Combat) (attacker: Combatant) =
     let betweenInclusive (min, max) x = min <= x && x <= max
     let potentialTargets =
@@ -84,7 +82,7 @@ let justAttack : ActionBehavior = behavior {
             | Resume(keepMoving) ->
                 return! loop (Some target.Id) keepMoving
         }
-    return! loop None notImpl
+    return! loop None (Absolute notImpl)
     }
 
 // note: we're not doing nowarn 40 here because throwing a notImpl exception is kind of weird, and if justFlee were a recursive object instead
@@ -99,7 +97,7 @@ let cowardly bhv flee : ActionBehavior = behavior {
     let rec loop bhv flee = behavior {
         let! ctx = query id
         let brave = let me = ctx.me_ in me.CurrentHP_ > me.stats.HP_ / 3
-        let! result = (if brave then bhv else flee)((), ctx)
+        let! result = run (if brave then bhv else flee)((), ctx)
         match result with
         | Resume followup ->
             // update whichever behavior we used
