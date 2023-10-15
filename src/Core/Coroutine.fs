@@ -34,7 +34,7 @@ type BehaviorBuilder() =
             because mem and action are outputs whereas feedback and context are inputs.
         *)
         // we discard the action/memory/context here, but we might have used them previously via QueryRequest to construct the action we're requesting
-        fun (feedback, ctx) ->
+        fun () ->
             AwaitingAction(action,
                 fun (feedback, ctx) ->
                     match binder (feedback, ctx) with
@@ -43,7 +43,7 @@ type BehaviorBuilder() =
                 |> Parameterized
                 )
             // ignoring feedback and context in favor of feedback' and ctx' feels wrong but seems to work. What's going on? Is it for the same reason that we ignore feedback and ctx in Return()? (I.e. feedback and ctx may have come in through previous bindings.)
-        |> Parameterized
+        |> Absolute
     member this.Bind(q: QueryRequest<_,'result>, binder: 'result -> Behavior<_,_,_,_>): Behavior<'action,'feedback,'ctx,'finalResult>  =
         fun(feedback, ctx) ->
             let (QueryRequest qf) = q
