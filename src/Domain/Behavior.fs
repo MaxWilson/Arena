@@ -40,21 +40,17 @@ let attack details = ReturnAction (Attack details)
 // move toward is a finite behavior, stops when you get within 1 yard of the target
 let inReach (ctx: ActionContext) targetId = ctx.geo.WithinDistance(ctx.me, targetId, 1.0<yards>)
 let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
-    printfn "Re-entered moveToward"
     let! ctx = query id
     let inReach = inReach ctx targetId
     if inReach then // TODO: enforce distance in action resolution, and allow Behavior to preview enforcement just like with ConsumeAttack. For now we just want to prevent infinite loops in the behavior.
         return () // done! We're in range, can do something else now.
     else
-        printfn $"moveToward about to send {Move(Person targetId)}"
         let! feedback, (ctx' : ActionContext) = ReturnAction(Move(Person targetId))
         // if we didn't get any hex-closer this round then yield, we're stuck
         let closer = ctx.combat.round = ctx'.combat.round && ctx'.geo.HexDistanceSquared(ctx'.me, targetId) < ctx.geo.HexDistanceSquared(ctx.me, targetId)
-        printfn $"{ctx.combat.round} = {ctx'.combat.round} && {ctx'.geo.HexDistanceSquared(ctx'.me, targetId)} < {ctx.geo.HexDistanceSquared(ctx.me, targetId)} [{closer}]"
         if closer then
             return! moveToward targetId
         else
-            printfn $"moveToward about to send {Yield}"
             let! feedback, (ctx' : ActionContext) = ReturnAction(Yield)
             return! moveToward targetId
     }
