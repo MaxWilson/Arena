@@ -201,8 +201,8 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
         editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
         editBerserkLevel "Berserk" (Some "") (stats.Berserk, [Mild; Moderate; Serious; Severe; Always], (fun v -> { stats with Berserk = v } |> update))
         class' "buttons" Html.div [
-            let cancel _ = dispatch (SetPage Home)
-            let save _ = dispatch (Upsert stats); dispatch (SetPage Home)
+            let cancel _ = dispatch (SetPage Fight)
+            let save _ = dispatch (Upsert stats); dispatch (SetPage Fight)
             let noSave = (stats.name |> System.String.IsNullOrWhiteSpace)
             Html.button [prop.text "Cancel"; prop.onClick cancel]
             Html.button [prop.text "OK"; prop.onClick save; prop.disabled noSave]
@@ -374,13 +374,13 @@ let ExecuteButton (model:Model) dispatch =
         React.useListener.onKeyDown(fun ev ->
             if ev.key = "Enter" && ev.ctrlKey then ev.preventDefault(); beginFights model dispatch
             )
-        Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
+        Html.button [prop.text (if model.execution = NotStarted then "Execute" else "Re-execute"); prop.onClick (thunk2 beginFights model dispatch)]
 
 [<ReactComponent>]
 let View (model: Model) dispatch =
     match model.page with
     | Editing name -> EditView name model.database dispatch
-    | Home ->
+    | Fight ->
         Html.div [
             prop.className "homePage"
             prop.children [
@@ -390,196 +390,201 @@ let View (model: Model) dispatch =
                     ]
 
                 class' "main" Html.div [
-                    class' "fightSetup" Html.div [
-                        let editLink (quantity: int option) (name: string) (setQuantity: int -> unit) =
-                            // for aesthetic and functional reasons, we don't want quantity to be part of the link, so it's a separate HTML element (usually an input element except for calibrated N)
-                            let numberTxt, txt =
-                                let creature = model.database.catalog[name]
-                                let numberInput (q: int) =
-                                    Html.input [prop.type'.number; prop.valueOrDefault q; prop.onChange setQuantity]
-                                match quantity with
-                                | Some 1 -> numberInput 1, creature.name
-                                | Some q -> numberInput q, creature.PluralName_
-                                | None -> Html.text "N", creature.PluralName_
-                            React.fragment [
-                                numberTxt
-                                classP' "editLink" Html.a [prop.text txt; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
-                                ]
-                        let changeQuantity (side: TeamSetup) (groupIndex: int, name: string) delta =
-                            side |> List.mapi (
-                                    fun ix group ->
-                                        if ix = groupIndex then
-                                            let members' =
-                                                group.members
-                                                |> List.map (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
-                                                |> List.filter (fun (quantity, _) -> quantity > 0)
-                                            { group with members = members' }
-                                        else group
-                                    )
-                                |> List.filter (fun group -> group.members.Length > 0)
-                        let setQuantity (side: TeamSetup) (groupIndex: int, name: string) q =
-                            side |> List.mapi (
-                                    fun ix group ->
-                                        if ix = groupIndex then
-                                            let members' =
-                                                group.members
-                                                |> List.map (function (_, name') when name = name' -> (q, name) | otherwise -> otherwise)
-                                                |> List.filter (fun (quantity, _) -> quantity > 0)
-                                            { group with members = members' }
-                                        else group
-                                    )
-                                |> List.filter (fun group -> group.members.Length > 0)
-                        class' "specificQuantity" Html.div [
-                            let changeQuantity address delta fightSetup = { fightSetup with sideA = changeQuantity fightSetup.sideA address delta }
-                            let setQuantity address delta fightSetup = { fightSetup with sideA = setQuantity fightSetup.sideA address delta }
-                            let addToSideA monsterName fightSetup =
-                                // add a new group, even if the current monster exists within an existing group, so they can be placed in different locations
-                                { fightSetup with
-                                    sideA = fightSetup.sideA@([1, monsterName] |> Team.fresh)
-                                    }
-                            MonsterPicker (model.database, model.fightSetup.sideA.IsEmpty) <|
-                                ("Add", addToSideA >> ChangeFightSetup >> dispatch, SideA, dispatch) <|
-                                    Html.div [
-                                        match model.fightSetup.sideA with
-                                        | [] -> Html.text "No creatures selected"
-                                        | sideA ->
-                                            for ix, group in sideA |> List.mapi Tuple2.create do
-                                                for quantity, name in group.members do
-                                                    Html.div [
-                                                        Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) +1)))]
-                                                        Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) -1)))]
-                                                        editLink (Some quantity) name (fun q -> dispatch (ChangeFightSetup (setQuantity (ix, name) q)))
-                                                        ]
-                                        ]
-                            ]
-                        Html.text "vs."
-                        class' "calibrated" Html.div [
-                            let wrapInDiv (element: ReactElement) = Html.div [element]
-                            let onClick msg =
-                                prop.onClick (fun _ -> dispatch (ChangeFightSetup msg))
-                            let changeMode fight =
-                                { fight
-                                    with
-                                    sideB =
-                                        // if there's at least one non-empty group, default to it. User will change it if they want to.
-                                        // preserve positioning if possible so user can toggle back and forth without disruption.
-                                        match fight.sideB with
-                                        | Specific (({ members = (quantity, name)::_ } as group)::_) ->
-                                            Calibrate { members = (Some name, None, None, TPK); center = group.center; radius = group.radius }
-                                        | Specific _ -> Team.freshCalibrated()
-                                        | Calibrate({ members = Some name, _, _, _} as group) -> Specific [{ members = [(1, name)]; center = group.center; radius = group.radius }]
-                                        | _ -> Specific []
-                                    }
-                            match model.fightSetup.sideB with
-                            | Specific sideB ->
-                                let changeQuantity address delta (f: FightSetup) =
-                                    match f.sideB with
-                                        | Specific lst ->
-                                            { f with sideB = Specific (changeQuantity lst address delta) }
-                                        | otherwise -> f // shouldn't normally happen but maybe could I guess if user clicks more rapidly than React can process commands. Just ignore it in that case.
-                                let setQuantity address q (f: FightSetup) =
-                                    match f.sideB with
-                                        | Specific lst ->
-                                            { f with sideB = Specific (setQuantity lst address q) }
-                                        | otherwise -> f // shouldn't normally happen but maybe could I guess if user clicks more rapidly than React can process commands. Just ignore it in that case.
-                                let addToSideB monsterName fightSetup =
+                    if model.execution = NotStarted then
+                        class' "fightSetup" Html.div [
+                            let editLink (quantity: int option) (name: string) (setQuantity: int -> unit) =
+                                // for aesthetic and functional reasons, we don't want quantity to be part of the link, so it's a separate HTML element (usually an input element except for calibrated N)
+                                let numberTxt, txt =
+                                    let creature = model.database.catalog[name]
+                                    let numberInput (q: int) =
+                                        Html.input [prop.type'.number; prop.valueOrDefault q; prop.onChange setQuantity]
+                                    match quantity with
+                                    | Some 1 -> numberInput 1, creature.name
+                                    | Some q -> numberInput q, creature.PluralName_
+                                    | None -> Html.text "N", creature.PluralName_
+                                React.fragment [
+                                    numberTxt
+                                    classP' "editLink" Html.a [prop.text txt; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
+                                    ]
+                            let changeQuantity (side: TeamSetup) (groupIndex: int, name: string) delta =
+                                side |> List.mapi (
+                                        fun ix group ->
+                                            if ix = groupIndex then
+                                                let members' =
+                                                    group.members
+                                                    |> List.map (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
+                                                    |> List.filter (fun (quantity, _) -> quantity > 0)
+                                                { group with members = members' }
+                                            else group
+                                        )
+                                    |> List.filter (fun group -> group.members.Length > 0)
+                            let setQuantity (side: TeamSetup) (groupIndex: int, name: string) q =
+                                side |> List.mapi (
+                                        fun ix group ->
+                                            if ix = groupIndex then
+                                                let members' =
+                                                    group.members
+                                                    |> List.map (function (_, name') when name = name' -> (q, name) | otherwise -> otherwise)
+                                                    |> List.filter (fun (quantity, _) -> quantity > 0)
+                                                { group with members = members' }
+                                            else group
+                                        )
+                                    |> List.filter (fun group -> group.members.Length > 0)
+                            class' "specificQuantity" Html.div [
+                                let changeQuantity address delta fightSetup = { fightSetup with sideA = changeQuantity fightSetup.sideA address delta }
+                                let setQuantity address delta fightSetup = { fightSetup with sideA = setQuantity fightSetup.sideA address delta }
+                                let addToSideA monsterName fightSetup =
                                     // add a new group, even if the current monster exists within an existing group, so they can be placed in different locations
                                     { fightSetup with
-                                        sideB = Specific (sideB@([1, monsterName] |> Team.fresh))
+                                        sideA = fightSetup.sideA@([1, monsterName] |> Team.fresh)
                                         }
-
-                                MonsterPicker (model.database, sideB.IsEmpty) ("Add", addToSideB >> ChangeFightSetup >> dispatch, SideB, dispatch) <| React.fragment [
-                                    Html.button [prop.text "Specific number"; onClick changeMode]
-                                        |> wrapInDiv
-                                    match sideB with
-                                    | [] -> Html.text "No creatures selected"
-                                    | sideB ->
-                                        for ix, group in sideB |> List.mapi Tuple2.create do
-                                            for quantity, name in group.members do
-                                                Html.div [
-                                                    Html.button [prop.text "+"; onClick (changeQuantity (ix, name) +1)]
-                                                    Html.button [prop.text "-"; onClick (changeQuantity (ix, name) -1)]
-                                                    editLink (Some quantity) name (setQuantity (ix, name) >> ChangeFightSetup >> dispatch)
-                                                    ]
-                                    ]
-                            | Calibrate({ members = (name, min, max, defeatCriteria) } as setup) ->
-                                let setSideB f fightSetup =
-                                    { fightSetup with sideB = Calibrate { setup with members = f setup.members } }
-                                let setSideBName name = setSideB (fun (_, min, max, defeatCriteria) -> (Some name, min, max, defeatCriteria))
-                                let setSideBMin min = setSideB (fun (name, _, max, defeatCriteria) -> (name, min, max, defeatCriteria))
-                                let setSideBMax max = setSideB (fun (name, min, _, defeatCriteria) -> (name, min, max, defeatCriteria))
-                                let setSideBDefeatCriteria defeatCriteria = setSideB (fun (name, min, max, _) -> (name, min, max, defeatCriteria))
-                                MonsterPicker (model.database, name.IsNone) ("Set", setSideBName >> ChangeFightSetup >> dispatch, SideB, dispatch) <| React.fragment [
-                                    Html.button [prop.text "Find optimal quantity"; onClick changeMode]
-                                        |> wrapInDiv
-                                    match name with
-                                    | Some name ->
-                                        class' "calibrationRange" Html.div [
-                                            Html.div [
-                                                editLink None name ignore
-                                                Html.text "should lose"
-                                                class' "calibrationRange" Html.span [
-                                                    let changeMin (txt: string) =
-                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
-                                                        v |> setSideBMin |> ChangeFightSetup |> dispatch
-                                                    let changeMax (txt: string) =
-                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
-                                                        v |> setSideBMax |> ChangeFightSetup |> dispatch
-                                                    Html.input [
-                                                        prop.type'.number; prop.placeholder (defaultArg min 50 |> toString)
-                                                        prop.onChange changeMin; prop.max 99
-                                                        match min with Some min -> prop.valueOrDefault min | None -> ()
-                                                        ]
-                                                    Html.text "% to "
-                                                    Html.input [
-                                                        prop.type'.number; prop.placeholder (defaultArg max 90 |> toString)
-                                                        prop.onChange changeMax; prop.max 99
-                                                        match max with Some max -> prop.valueOrDefault max | None -> ()
-                                                        ]
-                                                    Html.text "% of the time"
-                                                    ]
-                                                ]
-                                            Html.div [
-                                                Html.text "as measured by"
-                                                let defeatDescription =
-                                                    match defeatCriteria with
-                                                    | TPK -> "Not killing every enemy"
-                                                    | OneCasualty -> "Not killing at least one enemy"
-                                                    | HalfCasualties -> "Not killing at least half the enemies"
-                                                let toggleDefeatCriteria _ =
-                                                    let defeatCriteria =
-                                                        match defeatCriteria with
-                                                        | TPK -> OneCasualty
-                                                        | OneCasualty -> HalfCasualties
-                                                        | HalfCasualties -> TPK
-                                                    setSideBDefeatCriteria defeatCriteria |> ChangeFightSetup |> dispatch
-
-                                                Html.button [prop.text $"{defeatDescription}"; prop.onClick toggleDefeatCriteria]
-                                                ]
+                                MonsterPicker (model.database, model.fightSetup.sideA.IsEmpty) <|
+                                    ("Add", addToSideA >> ChangeFightSetup >> dispatch, SideA, dispatch) <|
+                                        Html.div [
+                                            match model.fightSetup.sideA with
+                                            | [] -> Html.text "No creatures selected"
+                                            | sideA ->
+                                                for ix, group in sideA |> List.mapi Tuple2.create do
+                                                    for quantity, name in group.members do
+                                                        Html.div [
+                                                            Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) +1)))]
+                                                            Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) -1)))]
+                                                            editLink (Some quantity) name (fun q -> dispatch (ChangeFightSetup (setQuantity (ix, name) q)))
+                                                            ]
                                             ]
-                                    | None -> Html.div "No creatures selected"
-                                    ]
+                                ]
+                            Html.text "vs."
+                            class' "calibrated" Html.div [
+                                let wrapInDiv (element: ReactElement) = Html.div [element]
+                                let onClick msg =
+                                    prop.onClick (fun _ -> dispatch (ChangeFightSetup msg))
+                                let changeMode fight =
+                                    { fight
+                                        with
+                                        sideB =
+                                            // if there's at least one non-empty group, default to it. User will change it if they want to.
+                                            // preserve positioning if possible so user can toggle back and forth without disruption.
+                                            match fight.sideB with
+                                            | Specific (({ members = (quantity, name)::_ } as group)::_) ->
+                                                Calibrate { members = (Some name, None, None, TPK); center = group.center; radius = group.radius }
+                                            | Specific _ -> Team.freshCalibrated()
+                                            | Calibrate({ members = Some name, _, _, _} as group) -> Specific [{ members = [(1, name)]; center = group.center; radius = group.radius }]
+                                            | _ -> Specific []
+                                        }
+                                match model.fightSetup.sideB with
+                                | Specific sideB ->
+                                    let changeQuantity address delta (f: FightSetup) =
+                                        match f.sideB with
+                                            | Specific lst ->
+                                                { f with sideB = Specific (changeQuantity lst address delta) }
+                                            | otherwise -> f // shouldn't normally happen but maybe could I guess if user clicks more rapidly than React can process commands. Just ignore it in that case.
+                                    let setQuantity address q (f: FightSetup) =
+                                        match f.sideB with
+                                            | Specific lst ->
+                                                { f with sideB = Specific (setQuantity lst address q) }
+                                            | otherwise -> f // shouldn't normally happen but maybe could I guess if user clicks more rapidly than React can process commands. Just ignore it in that case.
+                                    let addToSideB monsterName fightSetup =
+                                        // add a new group, even if the current monster exists within an existing group, so they can be placed in different locations
+                                        { fightSetup with
+                                            sideB = Specific (sideB@([1, monsterName] |> Team.fresh))
+                                            }
+
+                                    MonsterPicker (model.database, sideB.IsEmpty) ("Add", addToSideB >> ChangeFightSetup >> dispatch, SideB, dispatch) <| React.fragment [
+                                        Html.button [prop.text "Specific number"; onClick changeMode]
+                                            |> wrapInDiv
+                                        match sideB with
+                                        | [] -> Html.text "No creatures selected"
+                                        | sideB ->
+                                            for ix, group in sideB |> List.mapi Tuple2.create do
+                                                for quantity, name in group.members do
+                                                    Html.div [
+                                                        Html.button [prop.text "+"; onClick (changeQuantity (ix, name) +1)]
+                                                        Html.button [prop.text "-"; onClick (changeQuantity (ix, name) -1)]
+                                                        editLink (Some quantity) name (setQuantity (ix, name) >> ChangeFightSetup >> dispatch)
+                                                        ]
+                                        ]
+                                | Calibrate({ members = (name, min, max, defeatCriteria) } as setup) ->
+                                    let setSideB f fightSetup =
+                                        { fightSetup with sideB = Calibrate { setup with members = f setup.members } }
+                                    let setSideBName name = setSideB (fun (_, min, max, defeatCriteria) -> (Some name, min, max, defeatCriteria))
+                                    let setSideBMin min = setSideB (fun (name, _, max, defeatCriteria) -> (name, min, max, defeatCriteria))
+                                    let setSideBMax max = setSideB (fun (name, min, _, defeatCriteria) -> (name, min, max, defeatCriteria))
+                                    let setSideBDefeatCriteria defeatCriteria = setSideB (fun (name, min, max, _) -> (name, min, max, defeatCriteria))
+                                    MonsterPicker (model.database, name.IsNone) ("Set", setSideBName >> ChangeFightSetup >> dispatch, SideB, dispatch) <| React.fragment [
+                                        Html.button [prop.text "Find optimal quantity"; onClick changeMode]
+                                            |> wrapInDiv
+                                        match name with
+                                        | Some name ->
+                                            class' "calibrationRange" Html.div [
+                                                Html.div [
+                                                    editLink None name ignore
+                                                    Html.text "should lose"
+                                                    class' "calibrationRange" Html.span [
+                                                        let changeMin (txt: string) =
+                                                            let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                            v |> setSideBMin |> ChangeFightSetup |> dispatch
+                                                        let changeMax (txt: string) =
+                                                            let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                            v |> setSideBMax |> ChangeFightSetup |> dispatch
+                                                        Html.input [
+                                                            prop.type'.number; prop.placeholder (defaultArg min 50 |> toString)
+                                                            prop.onChange changeMin; prop.max 99
+                                                            match min with Some min -> prop.valueOrDefault min | None -> ()
+                                                            ]
+                                                        Html.text "% to "
+                                                        Html.input [
+                                                            prop.type'.number; prop.placeholder (defaultArg max 90 |> toString)
+                                                            prop.onChange changeMax; prop.max 99
+                                                            match max with Some max -> prop.valueOrDefault max | None -> ()
+                                                            ]
+                                                        Html.text "% of the time"
+                                                        ]
+                                                    ]
+                                                Html.div [
+                                                    Html.text "as measured by"
+                                                    let defeatDescription =
+                                                        match defeatCriteria with
+                                                        | TPK -> "Not killing every enemy"
+                                                        | OneCasualty -> "Not killing at least one enemy"
+                                                        | HalfCasualties -> "Not killing at least half the enemies"
+                                                    let toggleDefeatCriteria _ =
+                                                        let defeatCriteria =
+                                                            match defeatCriteria with
+                                                            | TPK -> OneCasualty
+                                                            | OneCasualty -> HalfCasualties
+                                                            | HalfCasualties -> TPK
+                                                        setSideBDefeatCriteria defeatCriteria |> ChangeFightSetup |> dispatch
+
+                                                    Html.button [prop.text $"{defeatDescription}"; prop.onClick toggleDefeatCriteria]
+                                                    ]
+                                                ]
+                                        | None -> Html.div "No creatures selected"
+                                        ]
+                                ]
+                            let notifyTeamMoved ((isTeamA, groupIx), (x: float<yards>, y: float<yards>)) =
+                                let x, y = Ops.round x, Ops.round y
+                                let changeTeamSetup (f: FightSetup) =
+                                    match isTeamA, f.sideB with
+                                    | true, _ ->
+                                        let team = f.sideA |> List.mapi (fun ix group -> if ix = groupIx then { group with center = (x, y) } else group)
+                                        { f with sideA = team }
+                                    | false, Specific team ->
+                                        let team = team |> List.mapi (fun ix group -> if ix = groupIx then { group with center = (x, y) } else group)
+                                        { f with sideB = Specific team }
+                                    | false, Calibrate group ->
+                                        // in this case ignore groupIx
+                                        { f with sideB = Calibrate { group with center = (x, y) } }
+                                ChangeFightSetup changeTeamSetup |> dispatch
+                            ArenaView.Setup model.database (model.fightSetup, notifyTeamMoved) dispatch
                             ]
-                        let notifyTeamMoved ((isTeamA, groupIx), (x: float<yards>, y: float<yards>)) =
-                            let x, y = Ops.round x, Ops.round y
-                            let changeTeamSetup (f: FightSetup) =
-                                match isTeamA, f.sideB with
-                                | true, _ ->
-                                    let team = f.sideA |> List.mapi (fun ix group -> if ix = groupIx then { group with center = (x, y) } else group)
-                                    { f with sideA = team }
-                                | false, Specific team ->
-                                    let team = team |> List.mapi (fun ix group -> if ix = groupIx then { group with center = (x, y) } else group)
-                                    { f with sideB = Specific team }
-                                | false, Calibrate group ->
-                                    // in this case ignore groupIx
-                                    { f with sideB = Calibrate { group with center = (x, y) } }
-                            ChangeFightSetup changeTeamSetup |> dispatch
-                        ArenaView.Setup model.database (model.fightSetup, notifyTeamMoved) dispatch
-                        ]
-                    ExecuteButton model dispatch
+
+                        ExecuteButton model dispatch
                     match model.execution with
-                    | NotStarted | InProgress _ -> ()
+                    | NotStarted -> ()
+                    | InProgress _ -> ExecuteButton model dispatch
                     | Completed (setup, result) ->
+                        Html.button [prop.text "Reset"; prop.onClick (fun _ -> (Fighting NotStarted) |> dispatch)]
+                        ExecuteButton model dispatch
                         let db = model.database
                         let teamToTxt team =
                             team

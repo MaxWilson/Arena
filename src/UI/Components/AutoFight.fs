@@ -3,7 +3,7 @@ open Domain
 open Domain.CombatRules
 
 type Page =
-    | Home
+    | Fight
     | Editing of name:string
 type Awaitable<'inProgress, 't> =
     | NotStarted
@@ -73,7 +73,7 @@ let init () =
         sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Team.fresh
         sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Team.randomInitialPosition
         }
-    { page = Home; fightSetup = fight; database = db; execution = NotStarted }
+    { page = Fight; fightSetup = fight; database = db; execution = NotStarted }
 
 let specificFight db team1 team2 = async {
     let cqrs = CQRS.CQRS.create((createCombat db team1 team2), CombatAtom.update)
@@ -107,24 +107,26 @@ let findRange evaluate (hardCap: _ option) = async {
             let rec findLowerBound n = async {
                 let! evalJustBelow = evaluate (n-1)
                 let! evalN = evaluate n
-                return
-                    match evalN, evalJustBelow with
-                    | JustRight, TooLow -> JustRight
-                    | TooLow, _ -> TooLow
-                    | TooHigh, _ -> TooHigh
-                    | JustRight, JustRight -> TooHigh // go lower until you find a JustRight/TooLow pair.
-                    | JustRight, TooHigh -> TooHigh // Note: JustRight/TooHigh doesn't make sense but could happen anyway if eval is noisy.
+                match! evaluate n with
+                | TooLow -> return TooLow
+                | TooHigh -> return TooHigh
+                | JustRight ->
+                    match! evaluate (n-1) with
+                    | TooLow -> return JustRight
+                    | JustRight -> return TooHigh // go lower until you find a JustRight/TooLow pair.
+                    | TooHigh -> return TooHigh // Note: JustRight/TooHigh doesn't make sense but could happen anyway if eval is noisy.
                 }
             let rec findUpperBound n = async {
                 let! evalN = evaluate n
                 let! evalJustAbove = evaluate (n+1)
-                return
-                    match evalN, evalJustAbove with
-                    | JustRight, TooHigh -> JustRight
-                    | TooLow, _ -> TooLow
-                    | TooHigh, _ -> TooHigh
-                    | JustRight, JustRight -> TooLow // go higher until you find a JustRight/TooHigh pair.
-                    | JustRight, TooLow -> TooLow // Note: JustRight/TooLow doesn't make sense but could happen anyway if eval is noisy.
+                match! evaluate n with
+                | TooLow -> return TooLow
+                | TooHigh -> return TooHigh
+                | JustRight ->
+                    match! evaluate (n+1) with
+                    | TooHigh -> return JustRight
+                    | JustRight -> return TooLow // go higher until you find a JustRight/TooHigh pair.
+                    | TooLow -> return TooLow // Note: JustRight/TooLow doesn't make sense but could happen anyway if eval is noisy.
                 }
             match hardCap with
             | Some hardCap when n > hardCap ->

@@ -5,9 +5,7 @@
   <ItemGroup>
     <None Include="Scratch\Behaviors.fsx" />
     <None Include="index.html" />
-    <None Include="sass/main.sass" />
     <Compile Include="Core\Common.fs" />
-    <Compile Include="Core\CommonUI.fs" />
     <Compile Include="Core\CQRS.fs" />
     <Compile Include="Core\Coroutine.fs" />
     <Compile Include="Core\Packrat.fs" />
@@ -16,6 +14,7 @@
     <Compile Include="Domain\Geo.fs" />
     <Compile Include="Domain\Behavior.fs" />
     <Compile Include="Domain\CombatRules.fs" />
+    <Compile Include="UI\CommonUI.fs" />
     <Compile Include="UI\Components\Sample.fs" />
     <Compile Include="UI\Components\DragDrop.fs" />
     <Compile Include="UI\Components\Konva.fs" />

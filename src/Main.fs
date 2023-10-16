@@ -10,7 +10,7 @@ open UI.Components.ArenaView
 open Browser.Dom
 open Fable
 open Fable.Core.JsInterop
-importSideEffects "./sass/main.sass"
+importSideEffects "../main.sass"
 
 [<ReactComponent>]
 let Arena() =
