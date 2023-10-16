@@ -47,11 +47,10 @@ let rec moveToward (targetId: CombatantId): ActionBehavior = behavior {
     else
         let! feedback, (ctx' : ActionContext) = ReturnAction(Move(Person targetId))
         // if we didn't get any hex-closer this round then yield, we're stuck
-        let closer = ctx.combat.round = ctx'.combat.round && ctx'.geo.HexDistanceSquared(ctx'.me, targetId) < ctx.geo.HexDistanceSquared(ctx.me, targetId)
-        if closer then
+        if ctx.combat.round = ctx'.combat.round && not (ctx'.geo.HexDistanceSquared(ctx'.me, targetId) < ctx.geo.HexDistanceSquared(ctx.me, targetId)) then
+            let! feedback, (ctx' : ActionContext) = ReturnAction(Yield)
             return! moveToward targetId
         else
-            let! feedback, (ctx' : ActionContext) = ReturnAction(Yield)
             return! moveToward targetId
     }
 
