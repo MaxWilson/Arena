@@ -33,7 +33,7 @@ let Router() =
                     for link, dest in [ "Autofight", "autofight"; "Interactive", "arena"; "Adventure", "adventure"; "Campaign", "campaign" ] do
                         if selected = link then
                             classP' "internalLink" Html.b [ prop.children [Html.text link] ]
-                        elif (["Adventure"; "Campaign"] |> List.contains link) then // we want to give an early warning BEFORE changing the URL
+                        elif (link = "Adventure") then // we want to give an early warning BEFORE changing the URL
                             classP' "internalLink" Html.a [prop.href ("#" + dest); prop.children [Html.text link]; prop.custom("data-text", link); prop.onClick (fun ev -> ev.preventDefault(); notImpl $"{link} mode" )]
                         else classP' "internalLink" Html.a [prop.href ("#" + dest); prop.children [Html.text link]; prop.custom("data-text", link) ]
                     classP' "srcLink" Html.a [
@@ -50,7 +50,9 @@ let Router() =
                 header "Interactive"
                 Arena()
             | [ "adventure" ] -> notImpl "Adventure mode"
-            | [ "campaign" ] -> notImpl "Campaign mode"
+            | [ "campaign" ] ->
+                header "Campaign"
+                Html.div "Campaign mode placeholder"
             | otherwise ->
                 header "Autofight"
                 AutoFight()

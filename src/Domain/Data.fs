@@ -348,11 +348,6 @@ module Data =
     | Specific of GroupSetup list
         with
         static member calibrated members setPosition = Calibrate (members |> setPosition)
-    type FightSetup = {
-        sideA: TeamSetup
-        sideB: Opposition
-        }
-        with static member fresh setPosition = { sideA = []; sideB = Opposition.calibrated (None, None, None, TPK) setPosition }
 
     [<AutoOpen>]
     module CombatAtoms =
@@ -373,12 +368,6 @@ module Data =
         type Atom = Logged of Logged | Unlogged of HouseKeeping
     type AugmentedCombatLog = (Atom option * AugmentedCombat) list
     type CombatLog = (Logged option * Combat) list
-
-    type Percent = float
-    type FightResult =
-        | CalibratedResult of lower:(int * Percent) option * upper:(int * Percent) option * sample:CombatLog
-        | SpecificResult of CombatLog * {| victors: int list |}
-
 
 module Resourcing =
     let (|ConsumeManeuver|_|) (c:Combatant) =

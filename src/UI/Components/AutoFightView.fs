@@ -9,6 +9,7 @@ open Domain.Random
 open Domain.Random.Parser
 open Feliz.Listeners
 open UI.Components.AutoFight
+open UI.Data
 
 [<ReactComponent>]
 let MonsterPicker (db: MonsterDatabase, noMonstersSelectedYet) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =

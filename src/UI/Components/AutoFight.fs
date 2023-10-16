@@ -1,6 +1,7 @@
 module UI.Components.AutoFight
 open Domain
 open Domain.CombatRules
+open UI.Data
 
 type Page =
     | Fight

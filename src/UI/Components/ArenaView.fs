@@ -8,6 +8,7 @@ open Elmish
 open Domain.Data
 open Domain.Geo
 open UI.Components.Arena
+open UI.Data
 
 [<AutoOpen>]
 module private Impl =
