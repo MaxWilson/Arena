@@ -77,7 +77,7 @@ let init () =
 
 let specificFight db team1 team2 = async {
     let cqrs = CQRS.CQRS.create((createCombat db team1 team2), CombatAtom.update)
-    let victors = fight cqrs
+    let! victors = fight cqrs
     return (cqrs.LogWithMessages() |> loggedOnly), victors
     }
 
@@ -150,7 +150,8 @@ let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, r
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
         let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
         let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
-        return cqrs, fight cqrs
+        let! fightResult = fight cqrs
+        return cqrs, fightResult
         }
     let get n = async {
         inform $"Evaluating vs. {enemyStats.Quantify n}"
@@ -199,13 +200,12 @@ let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, r
         }
     match! findRange eval (Some 100) with
     | min, max ->
-        let fightFor n =
-            let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
-            let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
-            fight cqrs |> ignore
-            let sampleFight = cqrs.LogWithMessages()
-            loggedOnly sampleFight
-        return Some (min, victoryFraction resultsCache[min] * 100.), Some (max, victoryFraction resultsCache[max] * 100.), Some (fightFor max)
+        let n = max
+        let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
+        let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
+        let! _ = fight cqrs // wait for the fight to terminate before querying CQRS
+        let sampleFight = cqrs.LogWithMessages()
+        return Some (min, victoryFraction resultsCache[min] * 100.), Some (max, victoryFraction resultsCache[max] * 100.), Some (loggedOnly sampleFight)
     }
 
 let beginFights (model: Model) dispatch =

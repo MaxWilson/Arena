@@ -159,6 +159,7 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
 let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
     let shownNames, setShownNames = React.useState Map.empty
     let hover, setHover = React.useState None
+    let isTouch, setIsTouch = React.useState false
     let nearestNeighborCache, setNearestNeighborCache = React.useState Map.empty
     let stageRef = React.useRef None
     let nodeRefs = React.useRef Map.empty
@@ -176,26 +177,25 @@ let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logge
                     |> List.map (fun c -> c.Id, geo.HexDistanceSquared(c.Id, (x,y)))
                     |> List.sortBy snd
                 match distancesSquared with
-                | [] -> []
-                | (closestId, distanceSquared)::rest ->
-                    // include anything that's reasonable close to the nearest thing if the pointer is also close to it
-                    let ids = closestId::(rest |> List.takeWhile (fun (_, d) -> d < distanceSquared + 1.<yards*yards>) |> List.map fst)
-                    setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) ids)
-                    ids
-        let showClosestMonster _ =
+                | (closestId, distanceSquared)::rest when distanceSquared <= 25.<yards^2> -> // look for anything that's reasonably close
+                    setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) (Some closestId))
+                    Some closestId
+                | _ -> None
+        let showClosestMonster isTouch' _ =
+            if isTouch <> isTouch' then setIsTouch isTouch'
             match stageRef.current with
             | None -> ()
             | Some ref ->
                 let x, y = let c = ref.getPointerPosition() in c.x, c.y
                 match nearest (x,y) with
-                | [] as v when hover <> None -> setHover None
-                | h::_ when hover <> Some h -> setHover (Some h)
+                | None when hover <> None -> setHover None
+                | Some h when hover <> Some h -> setHover (Some h)
                 | _ -> ()
-        Stage.onMouseMove showClosestMonster
-        Stage.onTouchStart showClosestMonster
-        Stage.onTouchMove showClosestMonster
-        Stage.onMouseLeave (fun _ -> setHover None)
+        Stage.onTouchStart (showClosestMonster true)
+        Stage.onTouchMove (showClosestMonster true)
         Stage.onTouchEnd (fun _ -> setHover None)
+        Stage.onMouseMove (showClosestMonster false)
+        Stage.onMouseLeave (fun _ -> setHover None)
 
         // maybe we shouldn't be doing this inside of stageProps since we only want the side effect... but we need access to the renderHelper for scaling,
         // and since stageProps will always run it doesn't really hurt anything. Maybe someday we'll refactor display to take a separate hooks() argument which
@@ -286,7 +286,7 @@ let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logge
                                     Rect.width textWidth
                                     Rect.offsetX (textWidth / 2 |> float)
                                     Rect.height 20
-                                    Rect.offsetY 32.
+                                    Rect.offsetY (32. + if isTouch then 20. else 0.)
                                     Rect.fill Color.White
                                     Rect.stroke Color.Black
                                     Rect.strokeWidth 2
@@ -299,7 +299,7 @@ let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logge
                                     Text.width textWidth
                                     Text.offsetX (textWidth / 2 |> float)
                                     Text.height 20
-                                    Text.offsetY 30.
+                                    Text.offsetY (30. + if isTouch then 20. else 0.)
                                     Text.fontSize 18
                                     if hover = Some c.Id then Text.fontStyle "900" // unusually bold
                                     else Text.fontStyle "bold"

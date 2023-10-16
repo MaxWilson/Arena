@@ -380,21 +380,25 @@ let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
 
             // NOW we clear the shock penalty. Right now that's the only housekeeping that doesn't happen on NewTurn.
             EndTurn attacker.Id |> silentExecute
-let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) =
-    let rec loop counter =
+
+let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) = async {
+    let rec loop counter = async {
+        do! Async.Sleep 0 // yield the thread so that the UI can update
         let survivingTeams =
             let everyone = cqrs.State.combat.combatants.Values |> List.ofSeq
             everyone |> List.choose (fun c -> if c.isnt [Dead; Unconscious] then Some c.team else None)
                      |> List.distinct
         if survivingTeams.Length < 2 || counter > 100 then
             // it's possible to have a tie or a mutual kill
-            {| victors = survivingTeams |}
+            return {| victors = survivingTeams |}
         else
             if counter > 1 then
                 cqrs.Execute (Logged(NewRound(counter)))
             fightOneRound cqrs
-            loop (counter + 1)
-    loop 1
+            return! loop (counter + 1)
+        }
+    return! loop 1
+    }
 
 let radius_ (group:GroupSetup) =
     match group.radius with

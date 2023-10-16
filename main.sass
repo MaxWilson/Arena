@@ -109,10 +109,13 @@ img, picture, svg, video
                 button
                     margin-left: 3px
     .combat
+        margin: 5px
         display: grid
         grid-template-rows: auto 1fr auto
-        grid-template-columns: auto 1fr
-        grid-template-areas: "statusTable logButtons" "statusTable logEntries" "visuals visuals"
+        grid-template-columns: auto minmax(auto, 1fr)
+        grid-template-areas: "statusTable statusTable" "logButtons logButtons" "logEntries logEntries" "visuals visuals"
+        @media (min-width: 400px)
+            grid-template-areas: "statusTable logButtons" "statusTable logEntries" "visuals visuals"
         @media (min-width: 800px)
             grid-template-areas: "statusTable logButtons visuals" "statusTable logEntries visuals"
         gap: 5px

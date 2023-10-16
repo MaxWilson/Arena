@@ -270,7 +270,10 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                     let log = (Browser.Dom.document.getElementsByClassName "logEntries")[0]
                     let entry =
                         log.childNodes[newIndex]
-                    if gotoNearest then scrollIntoView entry else scrollSectionIntoView entry
+                    if gotoNearest then scrollIntoView entry else
+                        scrollSectionIntoView entry
+                        let logButtons = ((Browser.Dom.document.getElementsByClassName "logButtons")[0])
+                        scrollIntoView logButtons // always make sure the buttons are visible after scrolling even on a small mobile screen
             let changeIndex delta =
                 let newIndex = currentIndex + delta
                 setIndex true newIndex
