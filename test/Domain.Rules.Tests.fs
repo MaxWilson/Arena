@@ -27,14 +27,14 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ baseDamage 100 = (RollSpec.create(11,6), RollSpec.create(13,6)) @>
 
     testCase "Spot check defense choice" <| fun () ->
-        let previousAttacker = Combatant.fresh(2, "Ogre 1", 1, Creature.create "Ogre 1")
-        let attacker = Combatant.fresh(2, "Ogre 2", 2, Creature.create "Ogre 2")
-        let gunman = Combatant.fresh(2, "Gunman", 3, { Creature.create "Gunman" with CannotBeParried = true })
+        let previousAttacker = Combatant.fresh(2, "Ogre 1", 1, Stats.create "Ogre 1")
+        let attacker = Combatant.fresh(2, "Ogre 2", 2, Stats.create "Ogre 2")
+        let gunman = Combatant.fresh(2, "Gunman", 3, { Stats.create "Gunman" with CannotBeParried = true })
         let nowhere = coords (0., 0.)
         let geo = Geo.ofList [(1, "test1"), coords(0., 0.); previousAttacker.Id, coords (1., 0.); attacker.Id, coords(0., 1.); gunman.Id, coords(1., 1.)]
         let chooseDefense = chooseDefense geo
         let create dodge parry block retreatUsed =
-            let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
+            let stats = { Stats.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
             { Combatant.fresh(1, "test1", 1, stats) with retreating = if retreatUsed then Some (previousAttacker.Id, nowhere) else None }
         let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
@@ -94,11 +94,11 @@ let Tests = testLabel "Unit" <| testList "Rules" [
 
     testCase "Spot check target prioritization" <| fun () ->
         let attacker =
-            Combatant.fresh(1, "Andy", 1, Creature.create "Knight")
+            Combatant.fresh(1, "Andy", 1, Stats.create "Knight")
         let mutable counter = 2
         let create name injury conditions =
             counter <- counter + 1
-            { Combatant.fresh(2, name, counter, Creature.create "Target") with injuryTaken = injury; statusMods = conditions }
+            { Combatant.fresh(2, name, counter, Stats.create "Target") with injuryTaken = injury; statusMods = conditions }
         // we put stunned and prone targets at high priority.
         // prefer targets that are stunned but not yet at -HP,
         // then targets that are prone but not yet at -HP,
@@ -143,7 +143,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
 
     testCase "Resourcing spot-checks" <| fun() ->
         let inigo =
-            Combatant.fresh(1, "Inigo Montoya", 1, { Creature.create "Inigo" with UseRapidStrike = true; ExtraAttack = Some 1 })
+            Combatant.fresh(1, "Inigo Montoya", 1, { Stats.create "Inigo" with UseRapidStrike = true; ExtraAttack = Some 1 })
             |> Combatant.newTurn
         let after = match inigo with | Resourcing.ConsumeRapidStrike c -> c | v -> matchfail v
         verify <@ after.rapidStrikeBudget = Some 1 @>
@@ -160,8 +160,8 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ after.maneuverBudget = 0 @>
 
     testCase "TryApproach should never ask for an invalid movement--if it returns a result, actually moving there should always work" <| fun() ->
-        let alice = Combatant.fresh(1, "Alice", 1, Creature.create "Alice")
-        let bob = Combatant.fresh(1, "Bob", 1, Creature.create "Bob")
+        let alice = Combatant.fresh(1, "Alice", 1, Stats.create "Alice")
+        let bob = Combatant.fresh(1, "Bob", 1, Stats.create "Bob")
         let cqrs =
             let combat =
                 {   Combat.fresh with

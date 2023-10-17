@@ -408,7 +408,7 @@ let radius_ (group:GroupSetup) =
         let memberCount = group.members |> List.sumBy fst
         1.0<yards> * (sqrt (float memberCount))
 
-let toCombatants (db: Map<string, Creature>) teamNumber project =
+let toCombatants (db: Map<string, Stats>) teamNumber project =
     // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
     let mutable counter = 0
     let mutable perMonsterCounter = Map.empty
@@ -423,7 +423,7 @@ let toCombatants (db: Map<string, Creature>) teamNumber project =
                     perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
             ]
 
-let createCombat (db: Map<string, Creature>) (team1: TeamSetup) team2 =
+let createCombat (db: Map<string, Stats>) (team1: TeamSetup) team2 =
     let mutable geo = Geo.ofList []
     let place (group: GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, radius_ group

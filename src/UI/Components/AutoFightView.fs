@@ -102,7 +102,7 @@ let EditDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:
         prop.onChange (parser >> update)
         ]
 [<ReactComponent>]
-let EditDamage (label:string) (stats: Creature) update =
+let EditDamage (label:string) (stats: Stats) update =
     // This is kind of a hack, but we use Editing to keep track of whether we want to use the live view or the text view
     let editing, setEditing = React.useState false
     let render = toString
@@ -138,11 +138,11 @@ let EditDamage (label:string) (stats: Creature) update =
 
 [<ReactComponent>]
 let EditView (name: string) (db: MonsterDatabase) dispatch =
-    let stats = (db.catalog |> Map.tryFind name |> Option.defaultValue (Creature.create name))
+    let stats = (db.catalog |> Map.tryFind name |> Option.defaultValue (Stats.create name))
     let stats, setStats = React.useState stats
     let textView, setTextView = React.useState (stats.ToString())
     let textError, setTextError = React.useState false
-    let update = fun (stats: Creature) ->
+    let update = fun (stats: Stats) ->
         setTextView (stats.ToString())
         setStats stats
 

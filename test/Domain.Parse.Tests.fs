@@ -42,7 +42,7 @@ let UnitTests() = (testLabel "Unit") <| testList "Parse" [
 
 [<Tests>]
 let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
-    let weaponStats (c: Creature) = c.WeaponSkill.Value, c.Damage_, defaultArg c.DamageType Other
+    let weaponStats (c: Stats) = c.WeaponSkill.Value, c.Damage_, defaultArg c.DamageType Other
     testList "Bob" [
         let verify, pverify = makeVerify()
         let creature = lazy(

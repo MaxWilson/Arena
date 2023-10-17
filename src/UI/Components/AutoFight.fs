@@ -20,7 +20,7 @@ type Side = SideA | SideB
 type Msg =
     | ChangeFightSetup of (FightSetup -> FightSetup)
     | Clear of Side
-    | Upsert of Creature
+    | Upsert of Stats
     | SetPage of Page
     | Fighting of Awaitable<string option, FightSetup * FightResult>
 
@@ -144,7 +144,7 @@ let findRange evaluate (hardCap: _ option) = async {
     return! step1 1
     }
 
-let calibrate inform (db: Map<_,Creature>) (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
+let calibrate inform (db: Map<_,Stats>) (team1: TeamSetup) (center: Coords, radius: Distance option, enemyType, minbound, maxbound, defeatCriteria) = async {
     let enemyStats = db[enemyType]
     let runForN n run = async {
         inform $"Evaluating vs. {enemyStats.Quantify n} ({run}/10)"

@@ -55,7 +55,7 @@ module Data =
             | Serious -> "Serious (9)"
             | Severe -> "Severe (6)"
             | Always -> "Always"
-    type Creature = {
+    type Stats = {
         name: string
         pluralName: string prop
         ST: int prop
@@ -213,11 +213,11 @@ module Data =
                 ] |> List.filter String.isntWhitespace |> String.concat " "
 
     type MonsterDatabase = {
-        catalog: Map<string, Creature>
+        catalog: Map<string, Stats>
         }
         with
         static member fresh = { catalog = Map.empty }
-        static member add (monster: Creature) (db: MonsterDatabase) =
+        static member add (monster: Stats) (db: MonsterDatabase) =
             { catalog = Map.add monster.name monster db.catalog }
 
     type Status = OK | Stunned | Prone | Unconscious | Dead | Berserk
@@ -246,7 +246,7 @@ module Data =
         personalName: string
         number: int
         team: int
-        stats: Creature
+        stats: Stats
         injuryTaken: int
         shockPenalty: int
         statusMods: Status list
@@ -262,7 +262,7 @@ module Data =
         with
         member this.CurrentHP_ = this.stats.HP_ - this.injuryTaken
         member this.Id : CombatantId = this.team, this.personalName
-        static member fresh (team, name, number, stats: Creature) =
+        static member fresh (team, name, number, stats: Stats) =
             {   team = team
                 personalName = name
                 number = number
@@ -492,9 +492,9 @@ module Parser =
         | _ -> None
     let (|Creature|_|) = pack <| function
         | Words(name, OWSStr "[" (Words(plural, OWSStr "]" (OWSStr ":" (CreatureProperties(fprops, rest)))))) ->
-            Some(Creature.create(name, plural) |> fprops, rest)
+            Some(Stats.create(name, plural) |> fprops, rest)
         | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
-            Some(Creature.create(name) |> fprops, rest)
+            Some(Stats.create(name) |> fprops, rest)
         | _ -> None
     let (|Command|_|) = pack <| function
         | Str "add" (Creature(monster, rest)) -> Some((fun db -> MonsterDatabase.add monster db), rest)
