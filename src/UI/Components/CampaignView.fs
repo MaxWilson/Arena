@@ -15,10 +15,10 @@ let Campaign() =
         setN (n+1)
         lst@[CharacterSheet.create($"Bob {n}", (parse $"Bob: ST {10 + rand 8}"))]
     let onClick = (fun _ -> addToRoster |> ChangeRoster |> dispatch)
-    let hello = JSX.jsx "<fragment>hello</fragment>"
     JSX.jsx $"""
-        <div>Hello placeholder
-            <div>Roster: <ul>{state.roster |> List.map render}</ul></div>
+        <fragment>Campaign
+            <div>Roster:</div>
+            <ul>{state.roster |> List.map render}</ul>
             <button onClick={onClick}>Add</button>
-        </div>
+        </fragment>
         """
