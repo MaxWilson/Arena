@@ -52,7 +52,7 @@ let Router() =
             | [ "adventure" ] -> notImpl "Adventure mode"
             | [ "campaign" ] ->
                 header "Campaign"
-                Html.div "Campaign mode placeholder"
+                UI.Components.CampaignView.Campaign() |> React.ofJsx
             | otherwise ->
                 header "Autofight"
                 AutoFight()

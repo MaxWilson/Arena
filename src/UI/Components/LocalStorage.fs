@@ -19,10 +19,10 @@ let inline write (key: string) value =
 module Cache =
     let create<'t>() =
         let mutable cache = None
-        let read onCacheMiss arg =
+        let read onCacheMiss =
             match cache with
-            | Some v -> v
-            | None -> onCacheMiss arg
+            | Some (v: 't) -> v
+            | None -> onCacheMiss()
         let invalidate() =
             cache <- None
         read, invalidate
@@ -34,7 +34,7 @@ module Catalog =
    let key = "Catalog"
    let cacheRead, cacheInvalidate = Cache.create()
    let read (): Map<string, Stats> =
-       cacheRead (read key) (Domain.Defaults.database)
+       cacheRead (thunk2 read key Domain.Defaults.database)
    let write (v: Map<string, Stats>) =
        write key v
        cacheInvalidate()

@@ -29,6 +29,7 @@ type React =
             setter state
             state, setter
         else currentValue, setter
+    static member ofJsx (jsx: Fable.Core.JSX.Element) = jsx |> unbox<ReactElement>
 
 // originally from https://github.com/fable-compiler/fable-react/blob/master/docs/react-error-boundaries.md, but updated to Fable 4
 module ReactErrorBoundary =

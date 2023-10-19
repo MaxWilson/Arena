@@ -19,12 +19,22 @@ type CharacterSheet = {
     history: History
     notes: (string * System.DateTimeOffset) list
     }
+    with
+    static member create(personalName, stats) = {
+        id = System.Guid.NewGuid()
+        personalName = personalName
+        stats = stats
+        draft = stats.ToString()
+        history = History.fresh
+        notes = []
+        }
 
 type Roster = CharacterSheet list
 type IndividualOrGroup = Individual of CharacterSheet GroupSetup | Group of GroupSetup
-type TeamSetup = TeamSetup of teamNumber: int * IndividualOrGroup list
+type TeamNumber = int
+type Setup = Setup of (TeamNumber * IndividualOrGroup) list
 
-let createCombat (db: Map<string, Stats>) (teams: TeamSetup list) =
+let createCombat (db: Map<string, Stats>) (teams: Setup list) =
     let mutable geo = Geo.ofList []
     let place (group: _ GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, CombatRules.radius_ group
@@ -47,8 +57,8 @@ let createCombat (db: Map<string, Stats>) (teams: TeamSetup list) =
         // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
         let mutable counter = 0
         let mutable perMonsterCounter = Map.empty
-        fun (TeamSetup(teamNumber, groupings)) ->
-            [   for (individualOrGroup: IndividualOrGroup) in groupings do
+        fun (Setup lst) ->
+            [   for (teamNumber, individualOrGroup) in lst do
                     match individualOrGroup with
                     | Individual _ -> notImpl()
                     | Group group ->
