@@ -5,6 +5,42 @@ open UI.Components.Campaign
 open Domain.Data
 open Domain.Campaign
 
+[<ReactComponent>]
+let MonsterPicker (model:Model) =
+    let namePrefix, setNamePrefix = React.useState ""
+    Html.div [
+        Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange setNamePrefix]
+        classP' "newButton" Html.button [prop.text "New"; prop.onClick(thunk1 dispatch (SetPage (Editing "")))]
+        classP' "clearButton" Html.button [prop.text "Clear"; prop.onClick(fun _ -> setNamePrefix ""; dispatch (Clear side))]
+        let (Setup setup) = model.currentEncounterSetup
+        for teamNumber, group in setup do
+            match group with
+            | Individual _ -> notImpl()
+            | Group group ->
+                for quantity, name in group.members do
+                    Html.div [
+                        Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) +1)))]
+                        Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) -1)))]
+                        editLink (Some quantity) name (fun q -> dispatch (ChangeFightSetup (setQuantity (ix, name) q)))
+                        ]
+        if namePrefix.Length > 0 || noMonstersSelectedYet then
+            let matchingNames = db.catalog.Keys |> Seq.filter (fun name -> name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase)) |> List.ofSeq
+            for name in matchingNames |> List.take (min 10 matchingNames.Length) do
+                Html.div [
+                    Html.button [prop.text clickLabel; prop.onClick(fun _ -> onClick name)]
+                    Html.text name
+                    ]
+        ]
+
+
+[JSX.jsx]
+let SideView teamNumber dispatch =
+    JSX.jsx """
+    <div>
+
+    </div>
+    """
+
 [<JSX.Component>]
 let Campaign() =
     let (state: Model), dispatch = React.useElmishSimple init update

@@ -15,9 +15,11 @@ module Persist =
 
 type Model = {
     roster: Roster
+    monsters: Domain.Data.MonsterDatabase
     currentEncounterSetup: Domain.Campaign.Setup
     }
-    with static member fresh = { roster = []; currentEncounterSetup = Domain.Campaign.Setup [] }
+    with static member fresh = { roster = []; monsters = { MonsterDatabase.fresh with catalog = Domain.Defaults.database() }; currentEncounterSetup = Domain.Campaign.Setup [] }
+
 type Msg =
     | ChangeRoster of (Roster -> Roster)
 let update msg model =
