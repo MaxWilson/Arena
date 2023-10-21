@@ -34,5 +34,41 @@ This command builds the application and puts the generated files into the `dist`
 # Attributions
 
 Sword icon created by pongsakornRed - Flaticon. https://www.flaticon.com/free-icons/sword
+
 Sword icons created by Freepik - Flaticon. https://www.flaticon.com/free-icons/sword
+
 Shield icons created by Freepik - Flaticon. https://www.flaticon.com/free-icons/sword
+
+```mermaid
+sequenceDiagram
+  A-->B: Works!
+```
+
+::: mermaid
+stateDiagram-v2
+  state "Shining Sword" as flow {
+    [*] --> Autofight
+    [*] --> Adventure
+    state Autofight {
+        [*] --> Setup
+        SpecificFight: Specific Fight
+        Setup --> SpecificFight: Run specific fight once
+        Setup --> Calibrated: Run N times <br>to find N <br> fitting specified <br>victory %
+        SpecificFight --> [*]
+        Calibrated --> [*]
+    }
+    state Adventure {
+      ChooseParty: Choose PCs and allies
+      [*] --> ChooseParty
+      ChooseParty --> ChooseOpposition
+      ChooseParty --> ChooseAdventure
+      ChooseOpposition --> SetupEncounter
+      SetupEncounter: Set up positions, behaviors
+      SetupEncounter --> Execute
+      Execute --> AwardTreasure
+      AwardTreasure --> SaveProgress: Keep results
+      AwardTreasure --> [*]: Discard results
+      SaveProgress --> [*]
+    }
+  }
+:::
