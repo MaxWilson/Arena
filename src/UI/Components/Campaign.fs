@@ -19,7 +19,7 @@ type Model = {
     monsters: Domain.Data.MonsterDatabase
     currentEncounterSetup: Domain.Campaign.Setup
     }
-    with static member fresh = { mode = PartyPicking; roster = Persist.read(); monsters = { catalog = Domain.Defaults.database() }; currentEncounterSetup = Domain.Campaign.Setup [] }
+    with static member fresh = { mode = PartyPicking; roster = Persist.read(); monsters = { catalog = Domain.Defaults.database() }; currentEncounterSetup = [] }
 
 type Msg =
     | ChangeRoster of (Roster -> Roster)

@@ -20,7 +20,7 @@ type CharacterSheet = {
     notes: (string * System.DateTimeOffset) list
     }
     with
-    static member create(personalName, stats) = {
+    static member create personalName stats = {
         id = System.Guid.NewGuid()
         personalName = personalName
         stats = stats
@@ -30,11 +30,11 @@ type CharacterSheet = {
         }
 
 type Roster = CharacterSheet list
-type IndividualOrGroup = Individual of CharacterSheet GroupSetup | Group of GroupSetup
+type IndividualOrGroup = Individual of CharacterSheet | Group of int * monsterName: string
 type TeamNumber = int
-type Setup = Setup of (TeamNumber * IndividualOrGroup) list
+type Setup = ((TeamNumber * IndividualOrGroup) list) GroupSetup list
 
-let createCombat (db: Map<string, Stats>) (teams: Setup list) =
+let createCombat (db: Map<string, Stats>) (teams: Setup) =
     let mutable geo = Geo.ofList []
     let place (group: _ GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, CombatRules.radius_ group
@@ -57,12 +57,12 @@ let createCombat (db: Map<string, Stats>) (teams: Setup list) =
         // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
         let mutable counter = 0
         let mutable perMonsterCounter = Map.empty
-        fun (Setup lst) ->
-            [   for (teamNumber, individualOrGroup) in lst do
-                    match individualOrGroup with
-                    | Individual _ -> notImpl()
-                    | Group group ->
-                        for quantity, name in group.members do
+        fun (lst: Setup) ->
+            [   for group in lst do
+                    for member' in group.members do
+                        match member' with
+                        | teamNumber, Individual _ -> notImpl()
+                        | teamNumber, (Group (quantity, name)) ->
                             for i in 1..quantity do
                                 let stats = db[name]
                                 let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
@@ -70,7 +70,7 @@ let createCombat (db: Map<string, Stats>) (teams: Setup list) =
                             counter <- counter + quantity
                             perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
                 ]
-    let setup = teams |> List.collect (toCombatants db place)
+    let setup = teams |> (toCombatants db place)
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList
     let behaviors = setup |> List.map (fun (c, _) -> c.Id, Behavior.justAttack) |> Map.ofList
     {   combat =

@@ -496,6 +496,10 @@ module Parser =
         | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
             Some(Stats.create(name) |> fprops, rest)
         | _ -> None
+    let (|Character|_|) = pack <| function
+        | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
+            Some(Stats.create(name) |> fprops, rest)
+        | _ -> None
     let (|Command|_|) = pack <| function
         | Str "add" (Creature(monster, rest)) -> Some((fun db -> MonsterDatabase.add monster db), rest)
         | _ -> None

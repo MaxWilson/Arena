@@ -52,7 +52,7 @@ let Router() =
             | [ "adventure" ] -> notImpl "Adventure mode"
             | [ "campaign" ] ->
                 header "Campaign"
-                UI.Components.CampaignView.Campaign() |> React.ofJsx
+                UI.Components.CampaignView.Campaign()
             | otherwise ->
                 header "Autofight"
                 AutoFight()

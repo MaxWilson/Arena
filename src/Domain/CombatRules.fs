@@ -400,7 +400,7 @@ let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) = async {
     return! loop 1
     }
 
-let radius_ (group:GroupSetup) =
+let radius_ (group: _ GroupSetup) =
     match group.radius with
     | Some r -> r
     | None ->
