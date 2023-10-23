@@ -59,7 +59,19 @@ let PartyPicker (model:Model) teamNumber dispatch =
             Html.div [
                 Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
                 Html.label [prop.for' id; prop.text r.personalName]
-                Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
+                Html.input [prop.valueOrDefault r.draft; prop.disabled true]
+                ]
+        if party.Length > 0 then
+            Html.div [
+                let start _ =
+                    let group = {
+                        members = (teamNumber, party)
+                        radius = None
+                        center = coords(0., 0.) // we'll change this later, during Setup mode
+                        }
+                    dispatch (ChangeSetup (fun setup -> setup @ [group]))
+                    dispatch (SetMode ChooseOpposition)
+                Html.button [prop.text "Start"; prop.onClick start]
                 ]
         ]
     match draft with
@@ -114,7 +126,7 @@ let Campaign() =
     let n, setN = React.useState 1
     class' "campaign" Html.div [
         match state.mode with
-        | PartyPicking ->
+        | ChooseParty ->
             PartyPicker state 0 dispatch
         | _ ->
             let parse = Packrat.parser Domain.Parser.(|Creature|_|)
@@ -125,10 +137,9 @@ let Campaign() =
             let onClick = (fun _ -> addToRoster |> ChangeRoster |> dispatch)
             JSX.jsx $"""
                 <fragment>Campaign
-                    {PartyPicker state 0 dispatch}
                     <div>Roster:</div>
                     <ul>{state.roster |> List.map render}</ul>
-                    <button onClick={onClick}>Add</button>
+                    TODO: {state.mode.ToString()} mode
                 </fragment>
                 """
         |> React.ofJsx

@@ -59,6 +59,7 @@ stateDiagram-v2
     }
     state Adventure {
       ChooseParty: Choose PCs and allies
+      ChooseOpposition: Choose enemies
       [*] --> ChooseParty
       ChooseParty --> ChooseOpposition
       ChooseParty --> ChooseAdventure

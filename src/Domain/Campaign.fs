@@ -32,12 +32,17 @@ type CharacterSheet = {
 type Roster = CharacterSheet list
 type IndividualOrGroup = Individual of CharacterSheet | Group of int * monsterName: string
 type TeamNumber = int
-type Setup = ((TeamNumber * IndividualOrGroup) list) GroupSetup list
+type Setup = (TeamNumber * IndividualOrGroup list) GroupSetup list
 
 let createCombat (db: Map<string, Stats>) (teams: Setup) =
     let mutable geo = Geo.ofList []
+    let radius_ (group: _ GroupSetup) =
+        group.radius |> Option.defaultWith (fun () ->
+            let _, members = group.members
+            let memberCount = members |> List.sumBy (function Individual _ -> 1 | Group (quantity, _) -> quantity)
+            1.0<yards> * (sqrt (float memberCount)))
     let place (group: _ GroupSetup) (combatant: Combatant) =
-        let center, radius = group.center, CombatRules.radius_ group
+        let center, radius = group.center, radius_ group
         let gen (radius: float<yards>) =
             let angleRadians = random.NextDouble() * 2. * System.Math.PI
             let radius = random.NextDouble() * radius
@@ -59,10 +64,11 @@ let createCombat (db: Map<string, Stats>) (teams: Setup) =
         let mutable perMonsterCounter = Map.empty
         fun (lst: Setup) ->
             [   for group in lst do
-                    for member' in group.members do
+                    let teamNumber, members' = group.members
+                    for member' in members' do
                         match member' with
-                        | teamNumber, Individual _ -> notImpl()
-                        | teamNumber, (Group (quantity, name)) ->
+                        | Individual _ -> notImpl()
+                        | Group (quantity, name) ->
                             for i in 1..quantity do
                                 let stats = db[name]
                                 let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"

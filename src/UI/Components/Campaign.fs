@@ -12,21 +12,27 @@ module Persist =
     let write (v: Roster) =
         write key v
         cacheInvalidate()
-type Mode = PartyPicking | Opposition | Setup | Adventure | Treasure | Commit
+type Mode = ChooseParty | ChooseOpposition | SetupEncounter | Adventure | Treasure | Commit
 type Model = {
     mode: Mode
     roster: Roster
     monsters: Domain.Data.MonsterDatabase
-    currentEncounterSetup: Domain.Campaign.Setup
+    currentEncounterSetup: Setup
     }
-    with static member fresh = { mode = PartyPicking; roster = Persist.read(); monsters = { catalog = Domain.Defaults.database() }; currentEncounterSetup = [] }
+    with static member fresh = { mode = ChooseParty; roster = Persist.read(); monsters = { catalog = Domain.Defaults.database() }; currentEncounterSetup = [] }
 
 type Msg =
     | ChangeRoster of (Roster -> Roster)
+    | ChangeSetup of (Setup -> Setup)
+    | SetMode of Mode
 let update msg model =
     match msg with
     | ChangeRoster f ->
         { model with roster = model.roster |> f }
+    | ChangeSetup f ->
+        { model with currentEncounterSetup = model.currentEncounterSetup |> f }
+    | SetMode mode ->
+        { model with mode = mode }
 let init _ =
     Model.fresh
 
