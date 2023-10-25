@@ -59,11 +59,11 @@ let Router() =
             | [ "both" ] -> Components.HelloWorld(); Components.Counter()
             | [ "arena" ] ->
                 header "Interactive"
+                Html.h4 [Html.i "(Under construction)"]
                 Arena()
             | [ "adventure" ] -> notImpl "Adventure mode"
             | [ "campaign" ] ->
-                header "Campaign"
-                UI.Components.CampaignView.Campaign()
+                UI.Components.CampaignView.Campaign(header "Campaign")
             | [ "settings" ] ->
                 UI.Components.SettingsView.Settings(settings, header "Settings", changeSettings)
             | otherwise ->

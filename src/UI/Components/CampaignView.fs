@@ -121,10 +121,12 @@ let PartyPicker (model:Model) teamNumber dispatch =
         """
 
 [<JSX.Component>]
-let Campaign() =
+let Campaign(header) =
     let (state: Model), dispatch = React.useElmishSimple init update
     let n, setN = React.useState 1
     class' "campaign" Html.div [
+        header
+        Html.h4 [Html.i "(Under construction)"]
         match state.mode with
         | ChooseParty ->
             PartyPicker state 0 dispatch
