@@ -49,3 +49,13 @@ module Settings =
         write key v
         cacheInvalidate()
         v
+
+module AutofightSetup =
+    open UI.Data
+    let key = "AutofightSetup"
+    let cacheRead, cacheInvalidate = Cache.create()
+    let read fallback: FightSetup =
+        cacheRead (thunk2 read key fallback)
+    let write (v: FightSetup) =
+        write key v
+        cacheInvalidate()

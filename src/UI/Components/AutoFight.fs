@@ -70,10 +70,12 @@ let init () =
         else catalog
     let db =
         { catalog = UI.LocalStorage.Catalog.read() |> updateWithDefaults }
-    let fight = {
-        sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Team.fresh
-        sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Team.randomInitialPosition
-        }
+    let fight =
+        UI.LocalStorage.AutofightSetup.read (fun _ ->
+            {
+            sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Team.fresh
+            sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Team.randomInitialPosition
+            })
     { page = Fight; fightSetup = fight; database = db; execution = NotStarted }
 
 let specificFight db team1 team2 = async {
@@ -215,6 +217,7 @@ let beginFights (model: Model) dispatch =
         ()
     | _ ->
         let g = System.Guid.NewGuid()
+        model.fightSetup |> UI.LocalStorage.AutofightSetup.write
         Fighting (InProgress None) |> dispatch
         async {
             do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
