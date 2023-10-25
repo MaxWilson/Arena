@@ -26,6 +26,7 @@
     <Compile Include="UI\Components\AutoFightView.fs" />
     <Compile Include="UI\Components\Campaign.fs" />
     <Compile Include="UI\Components\CampaignView.fs" />
+    <Compile Include="UI\Components\Settings.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

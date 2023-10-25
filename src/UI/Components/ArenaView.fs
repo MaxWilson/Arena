@@ -157,7 +157,7 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
 
 
 [<ReactComponent>]
-let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
+let Actual (settings: Settings, combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logged option, geo: Geo2d) dispatch =
     let shownNames, setShownNames = React.useState Map.empty
     let hover, setHover = React.useState None
     let isTouch, setIsTouch = React.useState false
@@ -224,7 +224,12 @@ let Actual (combatants: Map<CombatantId, Combatant>, logEntry: CombatAtoms.Logge
             | _ -> cancelPriorAnimation None
             ), [| box logEntry |])
         ]
-    display (320, 320) stageProps <| fun r -> [
+    let display =
+        match settings.battlegridDisplaySize with
+        | Big -> display (600, 600)
+        | Small -> display (320, 320)
+        | Zero -> fun _ _ -> React.fragment []
+    display stageProps <| fun r -> [
         Layer.createNamed "Background" [
             Rect.create [
                 Rect.x 0

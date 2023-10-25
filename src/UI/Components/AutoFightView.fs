@@ -215,53 +215,55 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
         ]
 
 [<ReactComponent>]
-let ViewCombat (setup, combatLog: CombatLog) dispatch =
+let ViewCombat (settings: Settings, setup, combatLog: CombatLog) dispatch =
     let showRolls, setShowRolls = React.useState true
     // we want to reinitialize combat if and only if combatLog changes, instead of never reinitializing it. I.e. when we run a new fight we should wipe the old display and start over
     let combatLogEntry, setCombatLogEntry = React.useStateWithDependencies (fun () -> combatLog |> List.last) combatLog
     let logEntry, combat = combatLogEntry
     let currentIndex, setCurrentIndex = React.useState 0
     class' "combat" Html.div [
-        class' "visuals" Html.div [ArenaView.Actual (combat.combatants, logEntry, combat.geo) dispatch]
-        class' "statusTable" Html.div [
-            Html.table [
-                Html.thead [
-                    Html.tr [
-                        Html.th "Name"
-                        Html.th "HP"
-                        Html.th "Condition"
-                        ]
-                    ]
-                Html.tbody [
-                    for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.number) do
+        if settings.battlegridDisplaySize <> Zero then
+            class' "visuals" Html.div [ArenaView.Actual (settings, combat.combatants, logEntry, combat.geo) dispatch]
+        if settings.statsTableDisplaySize <> Zero then
+            class' ("statusTable" + if settings.statsTableDisplaySize = Big then " big" else "") Html.div [
+                Html.table [
+                    Html.thead [
                         Html.tr [
-                            prop.key c.personalName
-                            prop.className (if c.team = 1 then "teamBlue" else "teamPurple")
-                            prop.children [
-                                Html.td c.personalName
-                                Html.td c.CurrentHP_
-                                Html.td [
-                                    if c.is Dead then
-                                        prop.className "statusDead"
-                                        prop.text "Dead"
-                                    elif c.is Unconscious then
-                                        prop.className "statusDead"
-                                        prop.text "Unconscious"
-                                    else
-                                        match c.statusMods with
-                                        | [] ->
-                                            prop.className "statusOk"
-                                            prop.text "OK"
-                                        | mods ->
-                                            let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
-                                            prop.className "statusDisabled"
-                                            prop.text txt
+                            Html.th "Name"
+                            Html.th "HP"
+                            Html.th "Condition"
+                            ]
+                        ]
+                    Html.tbody [
+                        for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.number) do
+                            Html.tr [
+                                prop.key c.personalName
+                                prop.className (if c.team = 1 then "teamBlue" else "teamPurple")
+                                prop.children [
+                                    Html.td c.personalName
+                                    Html.td c.CurrentHP_
+                                    Html.td [
+                                        if c.is Dead then
+                                            prop.className "statusDead"
+                                            prop.text "Dead"
+                                        elif c.is Unconscious then
+                                            prop.className "statusDead"
+                                            prop.text "Unconscious"
+                                        else
+                                            match c.statusMods with
+                                            | [] ->
+                                                prop.className "statusOk"
+                                                prop.text "OK"
+                                            | mods ->
+                                                let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
+                                                prop.className "statusDisabled"
+                                                prop.text txt
+                                        ]
                                     ]
                                 ]
-                            ]
+                        ]
                     ]
                 ]
-            ]
         class' "logButtons" Html.div [
             let setIndex gotoNearest newIndex _ =
                 if newIndex >= 0 && newIndex < combatLog.Length then
@@ -305,62 +307,63 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
                 )
             checkbox Html.span "Show rolls" (showRolls, setShowRolls)
             ]
-        class' "logEntries" Html.div [
-            for (ix, (msg, state)) in combatLog |> List.mapi Tuple2.create do
-                let header (txt:string) = Html.h3 [prop.text txt; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
-                let div (children: ReactElement list) = Html.div [prop.children children; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
-                match msg with
-                | None -> header "Combat begins"
-                | Some msg ->
-                    let viewDetails details =
-                        if showRolls then
-                            classTxt' "details" Html.span $" {details}"
-                        else React.fragment []
-                    let name = function
-                        | (1, name) -> classTxt' "blueName" Html.span name
-                        | (2, name) -> classTxt' "purpleName" Html.span name
-                        | _ -> shouldntHappen()
-                    let miss = Html.img [prop.ariaLabel "Miss"; prop.src "img/shield_16x16.png"] // reuse the "defended" icon for misses because that seems to feel better than using a sword for misses.
-                    let defended = Html.img [prop.ariaLabel "Defended"; prop.src "img/shield_16x16.png"]
-                    let regularHit = Html.img [prop.ariaLabel "Hit"; prop.src "img/sword_16x16.png"]
-                    let bigHit = Html.img [prop.ariaLabel "Big Hit"; prop.src "img/crossedswords_16x16.png"]
-                        //<img aria-label="🗡️" src="/assets/47f10f1fb3beec3810f0f37cf4cccd95.svg" alt="🗡️" draggable="false" class="emoji" data-type="emoji" data-name=":dagger:">
-                        //<img aria-label="🗡️" src="/assets/47f10f1fb3beec3810f0f37cf4cccd95.svg" alt="🗡️" draggable="false" class="emoji" data-type="emoji" data-name=":dagger:">
-                        //<img aria-label="⚔️" src="/assets/e7159ba0fcc85f39f95227dd85f44aeb.svg" alt="⚔️" draggable="false" class="emoji" data-type="emoji" data-name=":crossed_swords:">
-                    let hpText hp = classP' "injury" Html.span [prop.text $"{hp} HP"]
+        if settings.logEntriesDisplaySize <> Zero then
+            class' ("logEntries" + if settings.logEntriesDisplaySize = Big then " big" else "") Html.div [
+                for (ix, (msg, state)) in combatLog |> List.mapi Tuple2.create do
+                    let header (txt:string) = Html.h3 [prop.text txt; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
+                    let div (children: ReactElement list) = Html.div [prop.children children; prop.onClick (fun _ -> setCurrentIndex ix; setCombatLogEntry (msg, state)); if ix = currentIndex then prop.className "selected"]
                     match msg with
-                    | Hit (ids, _, _, injury, statusImpact, rollDetails) ->
-                        let hit verb =
-                            div [bigHit; name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for "; hpText injury; viewDetails rollDetails]
-                        match statusImpact with
-                        | v when v |> List.contains Dead -> hit "kills"
-                        | v when v |> List.contains Unconscious -> hit "KOs"
-                        | v when v |> List.contains Stunned -> hit "stuns"
-                        | v when v |> List.contains Berserk ->
-                            div [bigHit; name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for "; hpText injury; viewDetails rollDetails]
-                        | _ ->
-                            div [regularHit; name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for "; hpText injury; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, _, { defense = Parry }, rollDetails) ->
-                        div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, _, { defense = Block }, rollDetails) ->
-                        div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
-                    | SuccessfulDefense(ids, _, { defense = Dodge }, rollDetails) ->
-                        div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
-                    | Miss (ids, _, rollDetails) ->
-                        div [miss; name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
-                    | FallUnconscious(id, rollDetails) ->
-                        div [name id; Html.text " falls unconscious "; viewDetails rollDetails]
-                    | Unstun(id, rollDetails) ->
-                        div [name id; Html.text " recovers from stun "; viewDetails rollDetails]
-                    | StandUp(id, rollDetails) ->
-                        div [name id; Html.text " stands up "; viewDetails rollDetails]
-                    | Info (id, msg, rollDetails) ->
-                        div [name id; Html.text $" {msg}"; viewDetails rollDetails]
-                    | MoveTo (id, _, _, _, describe) ->
-                        div [name id; Html.text $" {describe}"]
-                    | NewRound n ->
-                        header $"Round {n} starts"
-            ]
+                    | None -> header "Combat begins"
+                    | Some msg ->
+                        let viewDetails details =
+                            if showRolls then
+                                classTxt' "details" Html.span $" {details}"
+                            else React.fragment []
+                        let name = function
+                            | (1, name) -> classTxt' "blueName" Html.span name
+                            | (2, name) -> classTxt' "purpleName" Html.span name
+                            | _ -> shouldntHappen()
+                        let miss = Html.img [prop.ariaLabel "Miss"; prop.src "img/shield_16x16.png"] // reuse the "defended" icon for misses because that seems to feel better than using a sword for misses.
+                        let defended = Html.img [prop.ariaLabel "Defended"; prop.src "img/shield_16x16.png"]
+                        let regularHit = Html.img [prop.ariaLabel "Hit"; prop.src "img/sword_16x16.png"]
+                        let bigHit = Html.img [prop.ariaLabel "Big Hit"; prop.src "img/crossedswords_16x16.png"]
+                            //<img aria-label="🗡️" src="/assets/47f10f1fb3beec3810f0f37cf4cccd95.svg" alt="🗡️" draggable="false" class="emoji" data-type="emoji" data-name=":dagger:">
+                            //<img aria-label="🗡️" src="/assets/47f10f1fb3beec3810f0f37cf4cccd95.svg" alt="🗡️" draggable="false" class="emoji" data-type="emoji" data-name=":dagger:">
+                            //<img aria-label="⚔️" src="/assets/e7159ba0fcc85f39f95227dd85f44aeb.svg" alt="⚔️" draggable="false" class="emoji" data-type="emoji" data-name=":crossed_swords:">
+                        let hpText hp = classP' "injury" Html.span [prop.text $"{hp} HP"]
+                        match msg with
+                        | Hit (ids, _, _, injury, statusImpact, rollDetails) ->
+                            let hit verb =
+                                div [bigHit; name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for "; hpText injury; viewDetails rollDetails]
+                            match statusImpact with
+                            | v when v |> List.contains Dead -> hit "kills"
+                            | v when v |> List.contains Unconscious -> hit "KOs"
+                            | v when v |> List.contains Stunned -> hit "stuns"
+                            | v when v |> List.contains Berserk ->
+                                div [bigHit; name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for "; hpText injury; viewDetails rollDetails]
+                            | _ ->
+                                div [regularHit; name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for "; hpText injury; viewDetails rollDetails]
+                        | SuccessfulDefense(ids, _, { defense = Parry }, rollDetails) ->
+                            div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
+                        | SuccessfulDefense(ids, _, { defense = Block }, rollDetails) ->
+                            div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
+                        | SuccessfulDefense(ids, _, { defense = Dodge }, rollDetails) ->
+                            div [defended; name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
+                        | Miss (ids, _, rollDetails) ->
+                            div [miss; name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
+                        | FallUnconscious(id, rollDetails) ->
+                            div [name id; Html.text " falls unconscious "; viewDetails rollDetails]
+                        | Unstun(id, rollDetails) ->
+                            div [name id; Html.text " recovers from stun "; viewDetails rollDetails]
+                        | StandUp(id, rollDetails) ->
+                            div [name id; Html.text " stands up "; viewDetails rollDetails]
+                        | Info (id, msg, rollDetails) ->
+                            div [name id; Html.text $" {msg}"; viewDetails rollDetails]
+                        | MoveTo (id, _, _, _, describe) ->
+                            div [name id; Html.text $" {describe}"]
+                        | NewRound n ->
+                            header $"Round {n} starts"
+                ]
         ]
 
 [<ReactComponent>]
@@ -381,17 +384,14 @@ let ExecuteButton (model:Model) dispatch =
         Html.button [prop.text (if model.execution = NotStarted then "Execute" else "Re-execute"); prop.onClick (thunk2 beginFights model dispatch)]
 
 [<ReactComponent>]
-let View (model: Model) dispatch =
+let View (settings, header) (model: Model) dispatch =
     match model.page with
     | Editing name -> EditView name model.database dispatch
     | Fight ->
         Html.div [
             prop.className "homePage"
             prop.children [
-                Html.div [
-                    Html.h2 "Shining Sword Arena!"
-                    Html.h3 "For Dungeon Fantasy RPG and GURPS"
-                    ]
+                header
 
                 class' "main" Html.div [
                     if model.execution = NotStarted then
@@ -609,7 +609,7 @@ let View (model: Model) dispatch =
                                 Html.div $"Everybody dies!"
                             | _ ->
                                 Html.div $"Stalemate!"
-                            ViewCombat (setup, combat) dispatch
+                            ViewCombat (settings, setup, combat) dispatch
                         | CalibratedResult(min, max, sampleCombat) ->
                             let minQuantity, minPercent = match min with Some (qty, percent) -> Some qty, percent | None -> None, 90
                             let maxQuantity, maxPercent = match max with Some (qty, percent) -> Some qty, percent | None -> None, 50
@@ -630,12 +630,12 @@ let View (model: Model) dispatch =
                                     | n, m -> $"{m}%% to {n}%%"
                                 Html.div $"{setup.sideA |> teamToTxt} wins {percentDescription} of the time against {quantityDescription}"
                                 ]
-                            ViewCombat (setup, sampleCombat) dispatch
+                            ViewCombat (settings, setup, sampleCombat) dispatch
                     ]
                 ]
             ]
 
 [<ReactComponent>]
-let AutoFight() =
+let AutoFight(settings, header) =
     let state, dispatch = React.useElmishSimple init update
-    View state dispatch
+    View (settings, header) state dispatch

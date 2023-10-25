@@ -7,9 +7,11 @@ open UI.Components.Sample
 open UI.Components.AutoFightView
 open UI.Components.Arena
 open UI.Components.ArenaView
+open UI.Data
 open Browser.Dom
 open Fable
 open Fable.Core.JsInterop
+
 importSideEffects "../main.sass"
 
 [<ReactComponent>]
@@ -25,12 +27,13 @@ let Arena() =
 [<ReactComponent>]
 let Router() =
     let (currentUrl, updateUrl) = React.useState(Router.currentUrl())
+    let settings, changeSettings = React.useState (UI.LocalStorage.Settings.read()) |> Tuple2.mapsnd (fun f -> UI.LocalStorage.Settings.write >> f)
     React.router [
         router.onUrlChanged updateUrl
         router.children [
             let header selected =
                 class' "header" Html.div [
-                    for link, dest in [ "Autofight", "autofight"; "Interactive", "arena"; "Adventure", "adventure"; "Campaign", "campaign" ] do
+                    for link, dest in [ "Autofight", "autofight"; "Interactive", "arena"; "Adventure", "adventure"; "Campaign", "campaign"; "Settings", "settings" ] do
                         if selected = link then
                             classP' "internalLink" Html.b [ prop.children [Html.text link] ]
                         elif (link = "Adventure") then // we want to give an early warning BEFORE changing the URL
@@ -40,6 +43,14 @@ let Router() =
                         prop.href "https://github.com/MaxWilson/Arena/"
                         prop.children [Html.img [prop.ariaLabel "GitHub"; prop.src "img/GitHub_Logo.png"]]
                         prop.target "_blank"
+                        ]
+                    Html.div [
+                        Html.h2 "Shining Sword Arena!"
+                        match settings.ruleset with
+                        | UI.Data.DFRPG ->
+                            Html.h3 "For Dungeon Fantasy RPG and GURPS"
+                        | UI.Data.ACKS ->
+                            Html.h3 "For Adventurer, Conqueror, King System"
                         ]
                     ]
             match currentUrl with
@@ -53,9 +64,10 @@ let Router() =
             | [ "campaign" ] ->
                 header "Campaign"
                 UI.Components.CampaignView.Campaign()
+            | [ "settings" ] ->
+                UI.Components.SettingsView.Settings(settings, header "Settings", changeSettings)
             | otherwise ->
-                header "Autofight"
-                AutoFight()
+                AutoFight(settings, header "Autofight")
             ]
         ]
 

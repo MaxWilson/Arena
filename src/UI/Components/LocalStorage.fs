@@ -39,3 +39,13 @@ module Catalog =
        write key v
        cacheInvalidate()
 
+module Settings =
+    open UI.Data
+    let key = "Settings"
+    let cacheRead, cacheInvalidate = Cache.create()
+    let read (): Settings =
+        cacheRead (thunk2 read key (thunk UI.Data.Settings.fresh))
+    let write (v: Settings) =
+        write key v
+        cacheInvalidate()
+        v
