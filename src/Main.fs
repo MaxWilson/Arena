@@ -50,7 +50,7 @@ let Router() =
                         | UI.Data.DFRPG ->
                             Html.h3 "For Dungeon Fantasy RPG and GURPS"
                         | UI.Data.ACKS ->
-                            Html.h3 "For Adventurer, Conqueror, King System"
+                            Html.h3 [Html.text "For Adventurer, Conqueror, King System"; Html.i " (Under construction)"]
                         ]
                     ]
             match currentUrl with
