@@ -41,6 +41,11 @@ let SideView teamNumber dispatch =
     </div>
     """
 
+// workaround for bug #19: write PartyPicker functions externally, not as local functions
+let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
+let newPC setDraft _ = setDraft (Some $"{randomName()}: ST 10")
+
+
 [<JSX.Component>]
 let PartyPicker (model:Model) teamNumber dispatch =
     let party, setParty = React.useState []
@@ -102,26 +107,20 @@ let PartyPicker (model:Model) teamNumber dispatch =
                     ]
                 ]
             ]
-        |> React.toJsx
     | None ->
-    // we're tentatively using JSX for layout-heavy stuff, mostly just to see if it will work but also to see if it's easier to read
-        let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
-        let newPC _ = setDraft (Some $"{randomName()}: ST 10")
-        JSX.jsx """
-        <div>
-            <b>Party picker</b>
-            <div>
-                <input type="text" placeholder="Filter by name" />
-                <button onClick={newPC}>New PC</button>
-                <button>New monster</button>
-                <button>Clear</button>
-                {partyDisplay}
-            </div>
-        </div>
-        """
+        Html.div [
+            Html.b "Party picker"
+            Html.div [
+                Html.input [prop.type'.text; prop.placeholder "Filter by name"]
+                Html.button [prop.onClick (newPC setDraft); prop.text "New PC"]
+                Html.button [prop.text "New monster"]
+                Html.button [prop.text "Clear"]
+                yield! partyDisplay
+                ]
+            ]
 
 [<JSX.Component>]
-let Campaign(header) =
+let Campaign(header: ReactElement) =
     let (state: Model), dispatch = React.useElmishSimple init update
     let n, setN = React.useState 1
     class' "campaign" Html.div [
@@ -144,5 +143,5 @@ let Campaign(header) =
                     TODO: {state.mode.ToString()} mode
                 </fragment>
                 """
-        |> React.ofJsx
+            |> React.ofJsx
         ]
