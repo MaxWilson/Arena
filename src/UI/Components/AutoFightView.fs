@@ -150,7 +150,7 @@ let EditView (name: string) (db: MonsterDatabase) dispatch =
     let editNumber = EditData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
     let editNumberNoHint = EditDataNoHint(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
     let editDecimalNumber = EditData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
-    let editRollSpec = EditDataNoHint<RollSpec>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
+    let editRollSpec = EditDataNoHint<RandomThrow>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
     let editDamageType = EditDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
     let editInjuryTolerance = EditDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
     let editBerserkLevel = EditDropdown(SelfControlLevel.toDescription, (fun (input: string) -> [Mild; Moderate; Serious; Severe; Always] |> List.tryFind (fun lvl -> SelfControlLevel.toDescription lvl = input)))

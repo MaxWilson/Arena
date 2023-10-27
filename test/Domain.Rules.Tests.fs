@@ -14,17 +14,17 @@ type DefenseResult = { defense: DefenseType; targetRetreated: bool }
 [<Tests>]
 let Tests = testLabel "Unit" <| testList "Rules" [
     testCase "Spot check damage computations" <| fun () ->
-        verify <@ swingDamage 25 +2 = RollSpec.create(5,6,+1) @>
-        verify <@ swingDamage 6 +2 = RollSpec.create(1,6,-1) @>
-        verify <@ thrustDamage 3 0 = RollSpec.create(1,6,-5) @>
-        verify <@ thrustDamage 37 +3 = RollSpec.create(4,6,+3) @>
+        verify <@ swingDamage 25 +2 = RandomThrow.create(5,6,+1) @>
+        verify <@ swingDamage 6 +2 = RandomThrow.create(1,6,-1) @>
+        verify <@ thrustDamage 3 0 = RandomThrow.create(1,6,-5) @>
+        verify <@ thrustDamage 37 +3 = RandomThrow.create(4,6,+3) @>
         let baseDamage st =
             thrustDamage st 0, swingDamage st 0
-        verify <@ baseDamage 16 = (RollSpec.create(1,6,+1), RollSpec.create(2,6,+2)) @>
-        verify <@ baseDamage 45 = (RollSpec.create(5,6), RollSpec.create(7,6,+1)) @>
-        verify <@ baseDamage 70 = (RollSpec.create(8,6), RollSpec.create(10,6)) @>
-        verify <@ baseDamage 75 = (RollSpec.create(8,6,+2), RollSpec.create(10,6,+2)) @>
-        verify <@ baseDamage 100 = (RollSpec.create(11,6), RollSpec.create(13,6)) @>
+        verify <@ baseDamage 16 = (RandomThrow.create(1,6,+1), RandomThrow.create(2,6,+2)) @>
+        verify <@ baseDamage 45 = (RandomThrow.create(5,6), RandomThrow.create(7,6,+1)) @>
+        verify <@ baseDamage 70 = (RandomThrow.create(8,6), RandomThrow.create(10,6)) @>
+        verify <@ baseDamage 75 = (RandomThrow.create(8,6,+2), RandomThrow.create(10,6,+2)) @>
+        verify <@ baseDamage 100 = (RandomThrow.create(11,6), RandomThrow.create(13,6)) @>
 
     testCase "Spot check defense choice" <| fun () ->
         let previousAttacker = Combatant.fresh(2, "Ogre 1", 1, Stats.create "Ogre 1")

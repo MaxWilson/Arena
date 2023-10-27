@@ -18,7 +18,7 @@ module Data =
             | Piercing -> "pi"
             | Burning -> "burn"
             | Other -> shouldntHappen()
-    type DamageSpec = Explicit of RollSpec | Swing of int | Thrust of int
+    type DamageSpec = Explicit of RandomThrow | Swing of int | Thrust of int
         with
         override this.ToString() =
             match this with
@@ -31,18 +31,18 @@ module Data =
     let ticksToDice ticks bonusOrPenalty =
         // every 4 dice is +1d.
         if ticks % 4 = 3 then
-            RollSpec.create((ticks + 1)/4, 6, -1 + bonusOrPenalty)
+            RandomThrow.create((ticks + 1)/4, 6, -1 + bonusOrPenalty)
         else
-            RollSpec.create(ticks / 4, 6, (ticks % 4) + bonusOrPenalty)
+            RandomThrow.create(ticks / 4, 6, (ticks % 4) + bonusOrPenalty)
     // Swing is (ST-6)/4 dice up to 26 (5d), then (ST+14)/8d dice up to 50 (8d), then (ST+30)/10 dice.
     // Thrust is (ST-6)/8 dice (rounded up to the next 0.25 dice) up to 70 (8d), then (ST+10)/10.
     let swingDamage st bonusOrPenalty =
-        if st < 9 then RollSpec.create(1,6, bonusOrPenalty + (st-12)/2)
+        if st < 9 then RandomThrow.create(1,6, bonusOrPenalty + (st-12)/2)
         elif st < 26 then ticksToDice (st-6) bonusOrPenalty
         elif st <= 50 then ticksToDice ((st+14) / 2) bonusOrPenalty
         else ticksToDice ((st+30)*4/10) bonusOrPenalty
     let thrustDamage st bonusOrPenalty =
-        if st < 13 then RollSpec.create(1,6, bonusOrPenalty + (st-14)/2)
+        if st < 13 then RandomThrow.create(1,6, bonusOrPenalty + (st-14)/2)
         elif st <= 70 then ticksToDice ((st-6+1) / 2) bonusOrPenalty
         else ticksToDice ((st+10+1)*4/10) bonusOrPenalty
     type InjuryTolerance = Unliving | Homogeneous | Diffuse
@@ -76,7 +76,7 @@ module Data =
         WeaponSkill: int prop
         Damage: DamageSpec prop
         DamageType: DamageType prop
-        FollowupDamage: RollSpec prop
+        FollowupDamage: RandomThrow prop
         FollowupDamageType: DamageType prop
         UnnaturallyFragile: bool
         Berserk: SelfControlLevel prop
@@ -139,7 +139,7 @@ module Data =
         member this.Damage_ =
             let addWeaponMasterDamage = function
                 | RollSpec(n, d, rest) as roll when this.WeaponMaster ->
-                    RollSpec.create(n*2) + roll
+                    RandomThrow.create(n*2) + roll
                 | otherwise -> otherwise
             match defaultArg this.Damage (Thrust 0) with
             | Explicit roll -> roll

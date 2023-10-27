@@ -1,6 +1,6 @@
 module Domain.Random
 
-type RollSpec = StaticBonus of int | RollSpec of n:int * d:int * rest: RollSpec option
+type RandomThrow = StaticBonus of int | RollSpec of n:int * d:int * rest: RandomThrow option
     with
     member this.roll() =
         let rec loop = function
@@ -32,14 +32,14 @@ type RollSpec = StaticBonus of int | RollSpec of n:int * d:int * rest: RollSpec 
             | RollSpec(n, d, None) -> RollSpec(n, d, Some (StaticBonus bonus))
             | RollSpec(n, d, Some rest) -> RollSpec(n, d, addBonus bonus rest |> Some)
         addBonus rhs lhs
-    static member (+)(lhs, rhs: RollSpec) =
+    static member (+)(lhs, rhs: RandomThrow) =
         let rec addRhs = function
             | StaticBonus n -> (rhs + n)
             | RollSpec(n, d, None) -> RollSpec(n, d, Some rhs)
             | RollSpec(n, d, Some rest) -> RollSpec(n, d, Some (addRhs rest))
         addRhs lhs
     static member (-)(lhs, rhs: int) = lhs + (-rhs)
-    static member (-)(lhs, rhs: RollSpec) =
+    static member (-)(lhs, rhs: RandomThrow) =
         let rec invert = function
             | StaticBonus n -> StaticBonus -n
             | RollSpec(n, d, None) -> RollSpec(-n, d, None)
@@ -57,7 +57,7 @@ module Parser =
         | Str "-" (IntNoWhitespace(penalty, rest)) -> Some(-penalty, rest)
         | _ -> None
     let (|Roll|_|) = pack <| function
-        | Int(n, (DieSize(dSize, (IntModifier(bonusOrPenalty, rest))))) -> Some(RollSpec.create(n, dSize, bonusOrPenalty), rest)
-        | Int(n, (DieSize(dSize, rest))) -> Some(RollSpec.create(n, dSize), rest)
-        | Int(v, rest) -> Some(RollSpec.create v, rest)
+        | Int(n, (DieSize(dSize, (IntModifier(bonusOrPenalty, rest))))) -> Some(RandomThrow.create(n, dSize, bonusOrPenalty), rest)
+        | Int(n, (DieSize(dSize, rest))) -> Some(RandomThrow.create(n, dSize), rest)
+        | Int(v, rest) -> Some(RandomThrow.create v, rest)
         | _ -> None

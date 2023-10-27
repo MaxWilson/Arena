@@ -4,6 +4,7 @@ open Feliz
 open UI.Components.Campaign
 open Domain.Data
 open Domain.Campaign
+open Domain.Random
 
 // [<ReactComponent>]
 // let MonsterPicker (model:Model) =
@@ -59,7 +60,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
             Html.div [
                 Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
                 Html.label [prop.htmlFor id; prop.text r.personalName]
-                Html.input [prop.valueOrDefault r.draft; prop.disabled true]
+                classP' "chooseParty" Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
                 ]
         if party.Length > 0 then
             Html.div [
@@ -95,7 +96,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
             if char.IsNone then
                 prop.className "error"
             prop.children [
-                Html.textarea [prop.valueOrDefault draft; prop.onChange (Some >> setDraft); prop.onKeyDown(fun e -> if e.ctrlKey && e.key = "Enter" then submit())]
+                classP' "chargen" Html.textarea [prop.valueOrDefault draft; prop.onChange (Some >> setDraft); prop.onKeyDown(fun e -> if e.ctrlKey && e.key = "Enter" then submit())]
                 Html.div [
                     Html.button [prop.text "Cancel"; prop.onClick (fun _ -> setDraft None)]
                     Html.button [prop.type'.submit; prop.text "Save"; if char.IsNone then prop.disabled true]
@@ -103,9 +104,6 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 ]
             ]
     | None ->
-        let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
-        let newPC setDraft _ = setDraft (Some $"{randomName()}: ST 10")
-
         Html.div [
             Html.b "Party picker"
             Html.div [

@@ -29,15 +29,15 @@ let parse (|Pattern|_|) input =
 [<Tests>]
 let UnitTests() = (testLabel "Unit") <| testList "Parse" [
     let verify, pverify = makeVerify()
-    verify "Basic roll" <@ parse (|Roll|_|) "3d6" = RollSpec.create(3,6) @>
-    verify "Basic roll" <@ parse (|Roll|_|) "3d-1" = RollSpec.create(3,6,-1) @>
-    verify "Basic roll" <@ parse (|Roll|_|) "1d+1" = RollSpec.create(1,6,+1) @>
-    verify "Basic roll" <@ parse (|Roll|_|) "4d" = RollSpec.create(4,6) @>
+    verify "Basic roll" <@ parse (|Roll|_|) "3d6" = RandomThrow.create(3,6) @>
+    verify "Basic roll" <@ parse (|Roll|_|) "3d-1" = RandomThrow.create(3,6,-1) @>
+    verify "Basic roll" <@ parse (|Roll|_|) "1d+1" = RandomThrow.create(1,6,+1) @>
+    verify "Basic roll" <@ parse (|Roll|_|) "4d" = RandomThrow.create(4,6) @>
     verify "thr" <@ parse (|DamageOverall|_|) "thr" = (Thrust 0, None) @>
     verify "thr -1 imp" <@ parse (|DamageOverall|_|) "thr -1 imp" = (Thrust -1, Some Impaling) @>
     verify "thr-1" <@ parse (|DamageOverall|_|) "thr-1" = (Thrust -1, None) @>
     verify "sw+2 cut" <@ parse (|DamageOverall|_|) "sw+2 cut" = (Swing +2, Some Cutting) @>
-    verify "4d-1 cr" <@ parse (|DamageOverall|_|) "4d-1 cr" = (Explicit (RollSpec.create(4,6,-1)), Some Crushing) @>
+    verify "4d-1 cr" <@ parse (|DamageOverall|_|) "4d-1 cr" = (Explicit (RandomThrow.create(4,6,-1)), Some Crushing) @>
     ]
 
 [<Tests>]
@@ -51,7 +51,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "Is named Bob" <@ creature.Value.name = "Bob the Barbarian" @>
         verify "ST" <@ creature.Value.ST.Value = 17 @>
         verify "DX" <@ creature.Value.DX.Value = 12 @>
-        verify "Skill, computed damage" <@ weaponStats creature.Value = (22, RollSpec.create(3,6,+7), Cutting)  @>
+        verify "Skill, computed damage" <@ weaponStats creature.Value = (22, RandomThrow.create(3,6,+7), Cutting)  @>
         ]
     testList "Peshkali" [
         let verify, pverify = makeVerify()
@@ -69,7 +69,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "Speed" <@ creature.Value.Speed_ = 6.0 @>
         verify "WeaponMaster" <@ creature.Value.WeaponMaster = true @>
         verify "WeaponSkill" <@ creature.Value.WeaponSkill = Some 22 @>
-        verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(3,6,+9) @>
+        verify "Damage" <@ creature.Value.Damage_ = RandomThrow.create(3,6,+9) @>
         verify "DamageType" <@ creature.Value.DamageType = Some Cutting @>
         verify "Dodge" <@ creature.Value.Dodge_ = 10 @>
         verify "Parry" <@ creature.Value.Parry = Some 13 @>
@@ -86,7 +86,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "Name" <@ creature.Value.name = "Tiger" @>
         verify "ST" <@ creature.Value.ST.Value = 13 @>
         verify "DX" <@ creature.Value.DX.Value = 15 @>
-        verify "Skill, computed damage" <@ creature.Value.WeaponSkill = Some 16 && creature.Value.Damage_ = RollSpec.create(2,6,-1) && creature.Value.DamageType = Some Impaling  @>
+        verify "Skill, computed damage" <@ creature.Value.WeaponSkill = Some 16 && creature.Value.Damage_ = RandomThrow.create(2,6,-1) && creature.Value.DamageType = Some Impaling  @>
         ]
     testList "Rock Mite" [
         let verify, pverify = makeVerify()
@@ -96,8 +96,8 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "Speed" <@ creature.Value.Speed_ = 5.5 @>
         verify "Homogeneous" <@ creature.Value.InjuryTolerance = Some Homogeneous @>
         verify "DR" <@ creature.Value.DR_ = 5 @>
-        verify "Bite damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,-1) && creature.Value.DamageType = Some Cutting @>
-        verify "Lava damage" <@ creature.Value.FollowupDamage = Some (RollSpec.create(2,6)) && creature.Value.FollowupDamageType = Some Burning @>
+        verify "Bite damage" <@ creature.Value.Damage_ = RandomThrow.create(1,6,-1) && creature.Value.DamageType = Some Cutting @>
+        verify "Lava damage" <@ creature.Value.FollowupDamage = Some (RandomThrow.create(2,6)) && creature.Value.FollowupDamageType = Some Burning @>
         ]
     testList "Stone Golem" [
         let verify, pverify = makeVerify()
@@ -105,7 +105,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
             parse (|Creature|_|) "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 HPT Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             )
         verify "UnnaturallyFragile" <@ creature.Value.UnnaturallyFragile = true @>
-        verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(3,6,+6) @>
+        verify "Damage" <@ creature.Value.Damage_ = RandomThrow.create(3,6,+6) @>
         verify "HPT" <@ creature.Value.HighPainThreshold = true @>
         ]
     testList "Inigo Montoya" [
@@ -133,7 +133,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
                 parse (|Creature|_|) "Cave Bear: ST 23 DX 11 IQ 4 HT 13 DR 2 Parry 9 Skill 13 2d thr+1 cut Berserk 9"
             )
         verify "Berserk" <@ creature.Value.Berserk = Some Serious @>
-        verify "Damage" <@ (creature.Value.Damage_, creature.Value.DamageType) = (RollSpec.create(2,6,+2), Some Cutting) @>
+        verify "Damage" <@ (creature.Value.Damage_, creature.Value.DamageType) = (RandomThrow.create(2,6,+2), Some Cutting) @>
         ]
     testList "Watcher" [
         let verify, pverify = makeVerify()
@@ -141,7 +141,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
                 parse (|Creature|_|) "Watcher: ST 12 DX 18 HT 12 Speed 10 Dodge 14 Parry 13 Skill 18 sw cut Extra Parry 3 Extra Attack 3 Altered Time Rate"
             )
         verify "ATR" <@ creature.Value.AlteredTimeRate = Some 1 @>
-        verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,+2) @>
+        verify "Damage" <@ creature.Value.Damage_ = RandomThrow.create(1,6,+2) @>
         ]
     testList "Round-trip" [
         let creatures = try Domain.Defaults.database().Values |> List.ofSeq with | _ -> []

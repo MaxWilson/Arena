@@ -146,11 +146,11 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
 module ExecuteAction =
     open Coroutine
     open Resourcing
-    let roll3d6 =
-        let dice = RollSpec.create(3,6)
+    let throw3d6 =
+        let dice = RandomThrow.create(3,6)
         dice.roll
     let detailedAttempt recordMsg label targetNumber =
-        let roll = roll3d6()
+        let roll = throw3d6()
         match successTest targetNumber roll with
         | CritSuccess _ as success ->
             recordMsg $"{label} critically succeeded (target {targetNumber}, rolled {roll})"
@@ -243,7 +243,7 @@ module ExecuteAction =
                     let target =
                         match berserkLevel with Mild -> 15 | Moderate -> 12 | Serious -> 9 | Severe -> 6 | Always -> 0
                     // we deliberately don't use attempt here because we don't want to clutter the log with self-control rolls
-                    if (roll3d6() <= target = false) then
+                    if (throw3d6() <= target = false) then
                         recordMsg $"{victim.personalName} goes berserk"
                         newConditions <- newConditions@[Berserk]
                         berserk <- true
@@ -327,7 +327,7 @@ module ExecuteAction =
 let fightOneRound (cqrs: CQRS.CQRS<_, AugmentedCombat>) =
     // HIGH speed and DX goes first so we use the negative of those values
     for c in cqrs.State.combat.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
-        let roll3d6 = RollSpec.create(3,6)
+        let roll3d6 = RandomThrow.create(3,6)
         let mutable msg = ""
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
