@@ -12,6 +12,7 @@ module Persist =
     let write (v: Roster) =
         write key v
         cacheInvalidate()
+
 type Mode = ChooseParty | ChooseOpposition | SetupEncounter | Adventure | Treasure | Commit
 type Model = {
     mode: Mode
@@ -28,7 +29,9 @@ type Msg =
 let update msg model =
     match msg with
     | ChangeRoster f ->
-        { model with roster = model.roster |> f }
+        let model = { model with roster = model.roster |> f }
+        Persist.write model.roster
+        model
     | ChangeSetup f ->
         { model with currentEncounterSetup = model.currentEncounterSetup |> f }
     | SetMode mode ->

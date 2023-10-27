@@ -41,11 +41,6 @@ let SideView teamNumber dispatch =
     </div>
     """
 
-// workaround for bug #19: write PartyPicker functions externally, not as local functions
-let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
-let newPC setDraft _ = setDraft (Some $"{randomName()}: ST 10")
-
-
 [<JSX.Component>]
 let PartyPicker (model:Model) teamNumber dispatch =
     let party, setParty = React.useState []
@@ -63,7 +58,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 else setParty (party |> List.filter (isCharacter r.id >> not))
             Html.div [
                 Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
-                Html.label [prop.for' id; prop.text r.personalName]
+                Html.label [prop.htmlFor id; prop.text r.personalName]
                 Html.input [prop.valueOrDefault r.draft; prop.disabled true]
                 ]
         if party.Length > 0 then
@@ -108,6 +103,9 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 ]
             ]
     | None ->
+        let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
+        let newPC setDraft _ = setDraft (Some $"{randomName()}: ST 10")
+
         Html.div [
             Html.b "Party picker"
             Html.div [
