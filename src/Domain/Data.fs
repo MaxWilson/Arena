@@ -496,8 +496,13 @@ module Parser =
         | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
             Some(Stats.create(name) |> fprops, rest)
         | _ -> None
+    let (|NameAndMaybeTitle|_|) =
+        let chars = alphanumeric + whitespace + Set.ofList [','; '\'']
+        function
+        | Chars chars (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
     let (|Character|_|) = pack <| function
-        | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
+        | NameAndMaybeTitle(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
             Some(Stats.create(name) |> fprops, rest)
         | _ -> None
     let (|Command|_|) = pack <| function

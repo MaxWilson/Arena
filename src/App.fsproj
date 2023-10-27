@@ -9,7 +9,9 @@
     <Compile Include="Core\Coroutine.fs" />
     <Compile Include="Core\Packrat.fs" />
     <Compile Include="Domain\Random.fs" />
+    <Compile Include="Domain\Onomastikon.fs" />
     <Compile Include="Domain\Data.fs" />
+    <Compile Include="Domain\Character.fs" />
     <Compile Include="Domain\Geo.fs" />
     <Compile Include="Domain\Behavior.fs" />
     <Compile Include="Domain\CombatRules.fs" />

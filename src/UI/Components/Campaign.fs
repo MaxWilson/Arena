@@ -2,6 +2,7 @@ module UI.Components.Campaign
 open Domain.Data
 open Domain.Campaign
 open Domain.Random
+open Domain.Character
 
 module Persist =
     open UI.LocalStorage
@@ -15,7 +16,9 @@ module Persist =
         cacheInvalidate()
 
 let newPC setDraft _ =
-    let randomName() = ["Bob"; "Lea"; "Lyron"; "Mortimer"; "Sally"; "Samantha"; "Sven"; "Tyrone"] |> chooseRandom
+    let randomName() =
+        let nation, name = makeNameAnyNation(chooseRandom [Male; Female])
+        $"{name} from {nation}"
     let rollStats() =
         RandomThrow.create(6,6).roll() / 2
     let DX = rollStats()
