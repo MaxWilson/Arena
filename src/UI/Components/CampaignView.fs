@@ -80,7 +80,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
         Html.form [
             let char =
                 match Packrat.ParseArgs.Init draft with
-                | Domain.Parser.Character (char, Packrat.End) -> Some char
+                | Domain.Character.Parser.Character (char, Packrat.End) -> Some char
                 | _ -> None
             let submit() =
                 match char with

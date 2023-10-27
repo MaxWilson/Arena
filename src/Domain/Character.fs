@@ -43,3 +43,19 @@ let makeNameAnyNation sex =
         | None -> recur (randomNation())
         | Some name -> nation, name
     recur (randomNation())
+
+#nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing
+module Parser =
+    open Packrat
+    open Random
+    open Random.Parser
+    open Domain.Parser
+    let (|NameAndMaybeTitle|_|) =
+        let chars = alphanumeric + whitespace + Set.ofList [','; '\'']
+        function
+        | Chars chars (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
+    let (|Character|_|) = pack <| function
+        | NameAndMaybeTitle(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
+            Some(Stats.create(name) |> fprops, rest)
+        | _ -> None
