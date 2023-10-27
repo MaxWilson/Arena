@@ -51,10 +51,38 @@ module Parser =
     open Random
     open Random.Parser
     open Domain.Parser
-    let (|RoleplayingData|_|) =
-        let chars = alphanumeric + whitespace + Set.ofList [','; '\''; '-']
+    let validNameCharsNoComma = alphanumeric + whitespace + Set.ofList ['\''; '-']
+    let (|CharacterName|_|) =
         function
-        | Chars chars (txt, rest) -> Some(RoleplayingData.create(txt.Trim()), rest)
+        | Chars validNameCharsNoComma (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
+    let (|Sex|_|) =
+        function
+        | Str "Male" rest -> Some(Male, rest)
+        | Str "Female" rest -> Some(Male, rest)
+        | Str "Neither" rest -> Some(Male, rest)
+        | _ -> None
+    let (|Race|_|) =
+        function
+        | Chars validNameCharsNoComma (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
+    let (|Title|_|) =
+        function
+        | Chars validNameCharsNoComma (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
+    let (|NationalOrigin|_|) =
+        function
+        | Chars validNameCharsNoComma (txt, rest) -> Some(txt.Trim(), rest)
+        | _ -> None
+
+    let (|Maybe|_|) delimiter (|Pattern|_|) = function
+        | Str delimiter (OWS (Pattern(v, rest))) -> Some(Some v, rest)
+        | rest -> Some(None, rest)
+
+    let (|RoleplayingData|_|) =
+        function
+        | CharacterName(name, Maybe "," (|Sex|_|) (sex, rest)) -> Some(RoleplayingData.create(name), rest)
+        | CharacterName(name, rest) -> Some(RoleplayingData.create(name), rest)
         | _ -> None
     let (|CharacterSheet|_|) = pack <| function
         | RoleplayingData(rp, OWSStr ":" (CreatureProperties(fprops, rest))) ->
