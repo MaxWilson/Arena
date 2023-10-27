@@ -143,12 +143,25 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "ATR" <@ creature.Value.AlteredTimeRate = Some 1 @>
         verify "Damage" <@ creature.Value.Damage_ = RandomThrow.create(1,6,+2) @>
         ]
-    testList "Round-trip" [
+    testCase "Round-trip creatures" <| fun () ->
         let creatures = try Domain.Defaults.database().Values |> List.ofSeq with | _ -> []
         for creature in creatures do
-            testCase creature.name <| fun () ->
-                let txt = creature |> toString
-                let parse = parse (|Creature|_|)
-                Swensen.Unquote.Assertions.test <@ parse txt = creature @>
-        ]
+            let txt = creature |> toString
+            let parse = parse (|Creature|_|)
+            Swensen.Unquote.Assertions.test <@ parse txt = creature @>
+    testCase "Round-trip roleplaying data spot checks" <| fun () ->
+        let rps = [
+            RoleplayingData.create("Lyron Barrister", Male, "Human", "King of Swords", "Tir na n'Og")
+            RoleplayingData.create("Kimchi So Small", Neither, title="King of Swords", nationalOrigin="Hamsterdam")
+            RoleplayingData.create("Lyra Kell", Female)
+            RoleplayingData.create("Ung", race="Ogrilon", title="The Sharkfist")
+            for i in 1..100 do
+                Domain.Character.Generate.randomly()
+            ]
+        let statss = Domain.Defaults.database().Values
+        for rp in rps do
+            let sheet = CharacterSheet.create(rp, chooseRandom statss)
+            let txt = sheet |> toString
+            let parse = parse Domain.Character.Parser.(|CharacterSheet|_|)
+            Swensen.Unquote.Assertions.test <@ parse txt = sheet @>
     ]

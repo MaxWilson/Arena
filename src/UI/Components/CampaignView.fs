@@ -1,10 +1,11 @@
 module UI.Components.CampaignView
 open Fable.Core
-open Feliz
 open UI.Components.Campaign
 open Domain.Data
 open Domain.Campaign
 open Domain.Random
+open Feliz
+open Feliz.Listeners
 
 // [<ReactComponent>]
 // let MonsterPicker (model:Model) =
@@ -59,7 +60,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 else setParty (party |> List.filter (isCharacter r.id >> not))
             Html.div [
                 Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
-                Html.label [prop.htmlFor id; prop.text r.personalName]
+                Html.label [prop.htmlFor id; prop.text r.rp.personalName]
                 classP' "chooseParty" Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
                 ]
         if party.Length > 0 then
@@ -75,20 +76,29 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 Html.button [prop.text "Start"; prop.onClick start]
                 ]
         ]
+    // React says you have to call the same hooks no matter what is rendered, so we ensure this
+    let withListener listeners body =
+        React.useListener.onKeyDown(fun ev ->
+            match listeners with
+            | None -> ()
+            | Some (save, cancel) ->
+                if ev.key = "Escape" then ev.preventDefault(); cancel()
+                elif ev.key = "s" && ev.ctrlKey then ev.preventDefault(); save())
+        body
     match draft with
     | Some draft ->
+        let char =
+            match Packrat.ParseArgs.Init draft with
+            | Domain.Character.Parser.CharacterSheet (char, Packrat.End) -> Some char
+            | _ -> None
+        let submit() =
+            match char with
+            | Some char ->
+                dispatch (ChangeRoster (fun roster -> roster @ [char]))
+                setDraft None
+            | None -> ()
+        let cancel _ = setDraft None
         Html.form [
-            let char =
-                match Packrat.ParseArgs.Init draft with
-                | Domain.Character.Parser.Character (char, Packrat.End) -> Some char
-                | _ -> None
-            let submit() =
-                match char with
-                | Some char ->
-                    let char = CharacterSheet.create char.name char
-                    dispatch (ChangeRoster (fun roster -> roster @ [char]))
-                    setDraft None
-                | None -> ()
             prop.onSubmit (fun ev ->
                 submit()
                 ev.preventDefault()
@@ -98,11 +108,13 @@ let PartyPicker (model:Model) teamNumber dispatch =
             prop.children [
                 classP' "chargen" Html.textarea [prop.valueOrDefault draft; prop.onChange (Some >> setDraft); prop.onKeyDown(fun e -> if e.ctrlKey && e.key = "Enter" then submit())]
                 Html.div [
-                    Html.button [prop.text "Cancel"; prop.onClick (fun _ -> setDraft None)]
+                    Html.button [prop.text "Cancel"; prop.onClick cancel]
                     Html.button [prop.type'.submit; prop.text "Save"; if char.IsNone then prop.disabled true]
                     ]
                 ]
             ]
+        |> withListener (Some(submit, cancel))
+
     | None ->
         Html.div [
             Html.b "Party picker"
@@ -114,6 +126,7 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 yield! partyDisplay
                 ]
             ]
+        |> withListener None
 
 [<JSX.Component>]
 let Campaign(header: ReactElement) =
@@ -130,7 +143,7 @@ let Campaign(header: ReactElement) =
             let render = (fun r -> JSX.jsx """<li><b>{r.personalName}</b></li>""")
             let addToRoster (lst: Roster) =
                 setN (n+1)
-                lst@[CharacterSheet.create $"Bob {n}" (parse $"Bob: ST {10 + rand 8}")]
+                lst@[CharacterSheet.create(RoleplayingData.create $"Bob {n}", (parse $"Bob: ST {10 + rand 8}"))]
             let onClick = (fun _ -> addToRoster |> ChangeRoster |> dispatch)
             JSX.jsx $"""
                 <fragment>Campaign

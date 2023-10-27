@@ -16,14 +16,12 @@ module Persist =
         cacheInvalidate()
 
 let newPC setDraft _ =
-    let randomName() =
-        let nation, name = makeNameAnyNation(chooseRandom [Male; Female])
-        $"{name} from {nation}"
+    let rp = Generate.randomly()
     let rollStats() =
         RandomThrow.create(6,6).roll() / 2
     let DX = rollStats()
     let skill = DX + (RandomThrow.create(1,6).roll())
-    setDraft (Some $"{randomName()}: ST {rollStats()} DX {DX} IQ {rollStats()} HT {rollStats()} Skill {skill} sw+1 cut")
+    setDraft (Some $"{rp}: ST {rollStats()} DX {DX} IQ {rollStats()} HT {rollStats()} Skill {skill} sw+1 cut")
 
 type Mode = ChooseParty | ChooseOpposition | SetupEncounter | Adventure | Treasure | Commit
 type Model = {

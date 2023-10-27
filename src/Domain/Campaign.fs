@@ -2,33 +2,6 @@
 module Domain.Campaign
 
 type Name = Character of string | Monster of string
-type History = {
-    kills: Map<Name, int>
-    experience: Map<Name, int>
-    }
-    with
-    static member fresh = { kills = Map.empty; experience = Map.empty }
-    static member xp this =
-        this.experience.Values |> Seq.sumBy System.Math.Log2 |> int
-
-type CharacterSheet = {
-    id: System.Guid
-    personalName: string
-    stats: Stats
-    draft: string // should be identical to stats but store a copy as a fallback, just in case one or the other fails due to deserialization issues
-    history: History
-    notes: (string * System.DateTimeOffset) list
-    }
-    with
-    static member create personalName stats = {
-        id = System.Guid.NewGuid()
-        personalName = personalName
-        stats = stats
-        draft = stats.ToString()
-        history = History.fresh
-        notes = []
-        }
-
 type Roster = CharacterSheet list
 type IndividualOrGroup = Individual of CharacterSheet | Group of int * monsterName: string
 type TeamNumber = int

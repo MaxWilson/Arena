@@ -152,6 +152,9 @@ module Data =
                 | _ when this.name |> System.String.IsNullOrWhiteSpace -> ""
                 | Some s when String.isntWhitespace s -> $"{this.name} [{s}]:"
                 | _ -> $"{this.name}:"
+            $"{names} {Stats.StatsOnlyToString this}"
+        static member StatsOnlyToString this =
+            // doesn't include the name.
             let labeled label = function
                 | Some v -> $"{label} {v}"
                 | _ -> ""
@@ -166,8 +169,7 @@ module Data =
             let selfControl label = function
                 | Some level -> $"{label} {toString level}" // NOT toDescription
                 | None -> ""
-            [   names
-                labeled "ST" this.ST
+            [   labeled "ST" this.ST
                 labeled "DX" this.DX
                 labeled "IQ" this.IQ
                 labeled "HT" this.HT
@@ -208,9 +210,73 @@ module Data =
                 show "Cannot Be Parried" this.CannotBeParried
                 selfControl "Berserk" this.Berserk
                 match this.InjuryTolerance with None -> "" | Some it -> it.ToString()
-
-
                 ] |> List.filter String.isntWhitespace |> String.concat " "
+    type Sex = Male | Female | Neither
+    type Name = string
+
+    type RoleplayingData = {
+        personalName: Name
+        sex: Sex
+        race: string option
+        title: string option
+        nationalOrigin: string option
+        }
+        with
+        static member create(personalName, ?sex, ?race, ?title, ?nationalOrigin) = {
+            personalName = personalName
+            sex = defaultArg sex Neither
+            race = race
+            title = title
+            nationalOrigin = nationalOrigin
+            }
+        override this.ToString() =
+            // e.g. "Daedelus Flavius, the Accursed, Male Human from Mordor"
+            let sexRace =
+                match this.sex, this.race with
+                | (Male | Female) as sex, Some race -> Some $"{sex} {race}"
+                | (Male | Female) as sex, None -> Some $"{sex}"
+                | Neither, Some race -> Some race
+                | Neither, None -> None
+            // maybe we could have factored this to be more programmatic and less explicit, but I think in this case it's more readable when it's explicit
+            match this.title, sexRace, this.nationalOrigin with
+            | Some title, Some sexRace, Some nation -> $"{this.personalName}, {title}, {sexRace} from {nation}"
+            | Some title, Some sexRace, None -> $"{this.personalName}, {title}, {sexRace}"
+            | Some title, None, Some nation -> $"{this.personalName}, {title}, from {nation}"
+            | Some title, None, None -> $"{this.personalName}, {title}"
+            | None, Some sexRace, Some nation -> $"{this.personalName}, {sexRace} from {nation}"
+            | None, Some sexRace, None -> $"{this.personalName}, {sexRace}"
+            | None, None, Some nation -> $"{this.personalName}, from {nation}"
+            | None, None, None -> $"{this.personalName}"
+
+    type History = {
+        kills: Map<Name, int>
+        experience: Map<Name, int>
+        }
+        with
+        static member fresh = { kills = Map.empty; experience = Map.empty }
+        static member xp this =
+            this.experience.Values |> Seq.sumBy System.Math.Log2 |> int
+
+    type CharacterSheet = {
+        id: System.Guid
+        rp: RoleplayingData
+        stats: Stats
+        draft: string // should be identical to stats but store a copy as a fallback, just in case one or the other fails due to deserialization issues
+        history: History
+        notes: (string * System.DateTimeOffset) list
+        }
+        with
+        static member create(rp, stats) = {
+            id = System.Guid.NewGuid()
+            rp = rp
+            stats = stats
+            draft = stats.ToString()
+            history = History.fresh
+            notes = []
+            }
+        override this.ToString() =
+            $"{this.rp}: {this.stats |> Stats.StatsOnlyToString}"
+
 
     type MonsterDatabase = {
         catalog: Map<string, Stats>
