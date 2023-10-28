@@ -216,34 +216,39 @@ module Data =
 
     type RoleplayingData = {
         personalName: Name
+        title: string option
         sex: Sex
         race: string option
-        title: string option
         nationalOrigin: string option
         }
         with
-        static member create(personalName, ?sex, ?race, ?title, ?nationalOrigin) = {
+        static member create(personalName, ?title, ?sex, ?race, ?nationalOrigin) = {
             personalName = personalName
             sex = defaultArg sex Neither
             race = race
             title = title
             nationalOrigin = nationalOrigin
             }
+        // it's sometimes convenient to be able to concisely specify just name and sex, no title
+        static member create(personalName:string, sex) = RoleplayingData.create(personalName, ?sex=Some sex)
+        static member create(personalName:string, sex, race) = RoleplayingData.create(personalName, ?sex=Some sex, ?race=Some race)
+        static member create(personalName:string, sex, race, nation) = RoleplayingData.create(personalName, ?sex=Some sex, ?race=Some race, ?nationalOrigin=Some nation)
+
         override this.ToString() =
             // e.g. "Daedelus Flavius, the Accursed, Male Human from Mordor"
             let sexRace =
                 match this.sex, this.race with
                 | (Male | Female) as sex, Some race -> Some $"{sex} {race}"
                 | (Male | Female) as sex, None -> Some $"{sex}"
-                | Neither, Some race -> Some race
-                | Neither, None -> None
+                | Neither, Some race -> Some $"Neuter {race}"
+                | Neither, None -> None // if there's no mention of race OR gender we omit them both entirely. This isn't a well-considered decision and we may revisit it at some point but for now it's an easy way to avoid grammar ambiguity.
             // maybe we could have factored this to be more programmatic and less explicit, but I think in this case it's more readable when it's explicit
             match this.title, sexRace, this.nationalOrigin with
-            | Some title, Some sexRace, Some nation -> $"{this.personalName}, {title}, {sexRace} from {nation}"
+            | Some title, Some sexRace, Some nation -> $"{this.personalName}, {title}, {sexRace}, from {nation}"
             | Some title, Some sexRace, None -> $"{this.personalName}, {title}, {sexRace}"
             | Some title, None, Some nation -> $"{this.personalName}, {title}, from {nation}"
             | Some title, None, None -> $"{this.personalName}, {title}"
-            | None, Some sexRace, Some nation -> $"{this.personalName}, {sexRace} from {nation}"
+            | None, Some sexRace, Some nation -> $"{this.personalName}, {sexRace}, from {nation}"
             | None, Some sexRace, None -> $"{this.personalName}, {sexRace}"
             | None, None, Some nation -> $"{this.personalName}, from {nation}"
             | None, None, None -> $"{this.personalName}"

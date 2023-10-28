@@ -151,8 +151,8 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
             Swensen.Unquote.Assertions.test <@ parse txt = creature @>
     testCase "Round-trip roleplaying data spot checks" <| fun () ->
         let rps = [
-            RoleplayingData.create("Lyron Barrister", Male, "Human", "King of Swords", "Tir na n'Og")
-            RoleplayingData.create("Kimchi So Small", Neither, title="King of Swords", nationalOrigin="Hamsterdam")
+            RoleplayingData.create("Lyron Barrister", "King of Swords", Male, "Human", "Tir na n'Og")
+            RoleplayingData.create("Kimchi So Small", "Tiny Fury", Neither, nationalOrigin="Hamsterdam")
             RoleplayingData.create("Lyra Kell", Female)
             RoleplayingData.create("Ung", race="Ogrilon", title="The Sharkfist")
             for i in 1..100 do
@@ -160,8 +160,11 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
             ]
         let statss = Domain.Defaults.database().Values
         for rp in rps do
-            let sheet = CharacterSheet.create(rp, chooseRandom statss)
+            let sheet = CharacterSheet.create(rp, { chooseRandom statss with name = rp.ToString(); pluralName = None })
             let txt = sheet |> toString
             let parse = parse Domain.Character.Parser.(|CharacterSheet|_|)
-            Swensen.Unquote.Assertions.test <@ parse txt = sheet @>
+            let p = { parse txt with id = sheet.id } // we're not trying to persist GUIDs, so remove id from the system under test
+            Swensen.Unquote.Assertions.test <@ p.rp = sheet.rp @>
+            Swensen.Unquote.Assertions.test <@ p.stats = sheet.stats @>
+            Swensen.Unquote.Assertions.test <@ p = sheet @>
     ]
