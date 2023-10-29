@@ -15,13 +15,13 @@ module Persist =
         write key v
         cacheInvalidate()
 
-let newPC setDraft _ =
+let newPC _ =
     let rp = Generate.randomly()
     let rollStats() =
         RandomThrow.create(6,6).roll() / 2
     let DX = rollStats()
     let skill = DX + (RandomThrow.create(1,6).roll())
-    setDraft (Some $"{rp}: ST {rollStats()} DX {DX} IQ {rollStats()} HT {rollStats()} Skill {skill} sw+1 cut")
+    $"{rp}: ST {rollStats()} DX {DX} IQ {rollStats()} HT {rollStats()} Skill {skill} sw+1 cut"
 
 type Mode = ChooseParty | ChooseOpposition | SetupEncounter | Adventure | Treasure | Commit
 type Model = {

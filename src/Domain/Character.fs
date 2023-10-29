@@ -22,10 +22,10 @@ let makeNameAndTitle (nationOfOrigin: string) (sex: Sex) =
             let surname = chooseFromLists [$"Last";$"Cognomen{sex}";$"Last{sex}";]
             $"{name} {surname}".Trim(), None
         let prefix (name, _title) =
-            let prefixes = ["Insanity"; "Black"; "Merciless"; "Gentle"; "Calamity"]
+            let prefixes = ["Insanity"; "Black"; "Blackheart"; "Merciless"; "Gentle"; "Calamity"; "Doughty"; "Dangerous"; (if sex = Female then "Dame" else "Sir"); "Cowardly"]
             $"{chooseRandom prefixes} {name}".Trim(), None
         let title (name, _title) =
-            let suffixes = ["Defender of Humanity"; "Last of the Dwarflords"; "the Accursed"; "Esquire"; "the Undying"; "the Merciful"; (if sex = Female then "Duchess of the Realm" else "Duke of the Realm"); "the Wall"; "the fat"]
+            let suffixes = ["Defender of Humanity"; "Last of the Dwarflords"; "the Accursed"; "Esquire"; "the Undying"; "the Merciful"; (if sex = Female then "Duchess of the Realm" else "Duke of the Realm"); "the Wall"; "the Stout"; "the Black"; "the White"; "the Grey"; "the Kinslayer"; "the Coward"]
             name, Some (chooseRandom suffixes)
         let allThree = (prefix >> lastName >> title)
         chooseRandomExponentialDecay 0.4 Seq.head [lastName; (lastName >> title); prefix; allThree] (firstName, None)
@@ -41,7 +41,8 @@ let makeName(sex, preferredNation) =
 type Generate =
     static member randomly(?sex: Sex, ?race: string, ?nation:string) =
         let sex = sex |> Option.defaultWith (thunk1 chooseRandom [Male; Female]) // only get Neither sex if explicitly asking for it
-        let race = race |> Option.orElseWith (fun _ -> chooseRandomExponentialDecay 0.4 Seq.head [Some "Human"; None; Some "Dwarf"; Some "Elf"; Some "Half-ogre"])
+        let randomPick lst = chooseRandomExponentialDecay 0.3 (fun _ -> chooseRandom (None::lst)) lst // we want no race to be fairly rare so we make it no more common than random even during fallback
+        let race = race |> Option.orElseWith (fun _ -> randomPick (List.map Some ["Human"; "Dwarf"; "Elf"; "Half-ogre"; "Coleopteran"]))
         let nation, name, title = makeName(sex, nation)
         RoleplayingData.create(name, ?title=title, ?sex=Some sex, ?race=race, nationalOrigin=nation)
 

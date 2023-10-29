@@ -43,7 +43,7 @@ let chooseRandomExponentialDecay (acceptRate: float) fallback (options: _ seq) =
     | option::rest ->
         if random.NextDouble() < acceptRate then option
         else recur rest
-    // fall back to first value in list if nothing else was accepted
+    // fall back if nothing else was accepted
     | [] -> options |> fallback
     recur (options |> List.ofSeq)
 let chooseWeightedRandom (options: (int * 't) seq) =

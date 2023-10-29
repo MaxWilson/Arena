@@ -43,26 +43,37 @@ let SideView teamNumber dispatch =
     </div>
     """
 
-[<JSX.Component>]
+[<ReactComponent>]
 let PartyPicker (model:Model) teamNumber dispatch =
     let party, setParty = React.useState []
+    let filter, setFilter = React.useStateWithDependencies (thunk "") model.roster
     let (draft: string option), setDraft = React.useState None
     let isCharacter id = function
         | Individual char when char.id = id -> true
         | _ -> false
-    let partyDisplay = [
-        for r in model.roster do
-            let id = $"chk_{r.id}"
-            let isChecked = party |> List.exists (isCharacter r.id)
-            let toggle nowChecked =
-                if nowChecked then
-                    setParty (party @ [Individual r])
-                else setParty (party |> List.filter (isCharacter r.id >> not))
-            Html.div [
-                Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
-                Html.label [prop.htmlFor id; prop.text r.rp.personalName]
-                classP' "chooseParty" Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
+    let partyDisplay = Html.div [
+
+        let partyRows = [
+            for r in model.roster do
+                let id = $"chk_{r.id}"
+                let isChecked = party |> List.exists (isCharacter r.id)
+                if isChecked || r.rp.personalName.StartsWith(filter, System.StringComparison.InvariantCultureIgnoreCase) then
+                    let toggle nowChecked =
+                        if nowChecked then
+                            setParty (party @ [Individual r])
+                        else setParty (party |> List.filter (isCharacter r.id >> not))
+                    classP' "partyRow" Html.tr [
+                        prop.key id
+                        prop.children (List.map (fun (d:ReactElement) -> Html.td d) [
+                            Html.input [prop.type'.checkbox; prop.id id; prop.isChecked isChecked; prop.onChange toggle]
+                            Html.label [prop.htmlFor id; prop.text r.rp.personalName]
+                            classP' "chooseParty" Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
+                            ])
+                        ]
                 ]
+        class' "partyDisplay" Html.table [
+            Html.tbody partyRows
+            ]
         if party.Length > 0 then
             Html.div [
                 let start _ =
@@ -98,37 +109,39 @@ let PartyPicker (model:Model) teamNumber dispatch =
                 setDraft None
             | None -> ()
         let cancel _ = setDraft None
-        Html.form [
-            prop.onSubmit (fun ev ->
-                submit()
-                ev.preventDefault()
-                )
+        Html.div [
             if char.IsNone then
                 prop.className "error"
             prop.children [
                 classP' "chargen" Html.textarea [prop.valueOrDefault draft; prop.onChange (Some >> setDraft); prop.onKeyDown(fun e -> if e.ctrlKey && e.key = "Enter" then submit())]
                 Html.div [
+                    Html.button [prop.text "Regenerate"; prop.onClick (newPC >> Some >> setDraft)]
                     Html.button [prop.text "Cancel"; prop.onClick cancel]
-                    Html.button [prop.type'.submit; prop.text "Save"; if char.IsNone then prop.disabled true]
+                    Html.button [prop.text "Save"; prop.onClick (thunk1 submit ()); if char.IsNone then prop.disabled true]
                     ]
                 ]
             ]
         |> withListener (Some(submit, cancel))
-
     | None ->
-        Html.div [
-            Html.b "Party picker"
-            Html.div [
-                Html.input [prop.type'.text; prop.placeholder "Filter by name"]
-                Html.button [prop.onClick (newPC setDraft); prop.text "New PC"]
-                Html.button [prop.text "New monster"]
-                Html.button [prop.text "Clear"]
-                yield! partyDisplay
-                ]
-            ]
+        // we're tentatively using JSX for layout-heavy stuff, mostly just to see if it will work but also to see if it's easier to read
+        let filterInput = Html.input [prop.placeholder "Filter by name"; prop.valueOrDefault filter; prop.onChange (setFilter)]
+        let clearButton = Html.button [prop.text "Clear"; prop.onClick (fun _ -> setFilter ""; if filter = "" then setParty [])] // double click to clear filter AND party
+        JSX.jsx $"""
+        <div>
+            <b>Party picker</b>
+            <div>
+                {filterInput}
+                <button onClick={newPC >> Some >> setDraft}>New PC</button>
+                <button>New monster</button>
+                {clearButton}
+                {partyDisplay}
+            </div>
+        </div>
+        """
+        |> React.ofJsx
         |> withListener None
 
-[<JSX.Component>]
+[<ReactComponent>]
 let Campaign(header: ReactElement) =
     let (state: Model), dispatch = React.useElmishSimple init update
     let n, setN = React.useState 1
@@ -139,18 +152,10 @@ let Campaign(header: ReactElement) =
         | ChooseParty ->
             PartyPicker state 0 dispatch
         | _ ->
-            let parse = Packrat.parser Domain.Parser.(|Creature|_|)
-            let render = (fun r -> JSX.jsx """<li><b>{r.personalName}</b></li>""")
-            let addToRoster (lst: Roster) =
-                setN (n+1)
-                lst@[CharacterSheet.create(RoleplayingData.create $"Bob {n}", (parse $"Bob: ST {10 + rand 8}"))]
-            let onClick = (fun _ -> addToRoster |> ChangeRoster |> dispatch)
             JSX.jsx $"""
-                <fragment>Campaign
-                    <div>Roster:</div>
-                    <ul>{state.roster |> List.map render}</ul>
+                <div>Campaign
                     TODO: {state.mode.ToString()} mode
-                </fragment>
+                </div>
                 """
             |> React.ofJsx
         ]
