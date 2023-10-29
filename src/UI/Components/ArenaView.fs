@@ -101,6 +101,7 @@ module private Impl =
             "duration" ==> durationSeconds
             "onFinish" ==> onFinish
             ])
+    let isMultitouch ev = ev?evt && ev?evt?touches && ev?evt?touches?length > 1
 
 [<ReactComponent>]
 let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
@@ -182,8 +183,10 @@ let Actual (settings: Settings, combatants: Map<CombatantId, Combatant>, logEntr
                     setNearestNeighborCache (nearestNeighborCache |> Map.add (x, y) (Some closestId))
                     Some closestId
                 | _ -> None
-        let showClosestMonster isTouch' _ =
+        let showClosestMonster isTouch' ev =
             if isTouch <> isTouch' then setIsTouch isTouch'
+            if isTouch && isMultitouch ev then () // allow normal pinch/zoom/pan to proceed without interference
+            else
             match stageRef.current with
             | None -> ()
             | Some ref ->
