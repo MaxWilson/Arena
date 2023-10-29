@@ -7,6 +7,16 @@ type IndividualOrGroup = Individual of CharacterSheet | Group of int * monsterNa
 type TeamNumber = int
 type Setup = (TeamNumber * IndividualOrGroup list) GroupSetup list
 
+module Setup =
+    let enumerateMembers setup =
+        [   for ix, group in setup |> List.mapi Tuple2.create do
+                let teamNumber, members = group.members
+                for ix2, member1 in members |> List.mapi Tuple2.create do
+                    let address = ix, ix2
+                    yield address, group, teamNumber, member1
+            ]
+
+
 let createCombat (db: Map<string, Stats>) (teams: Setup) =
     let mutable geo = Geo.ofList []
     let radius_ (group: _ GroupSetup) =
