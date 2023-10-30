@@ -420,6 +420,19 @@ module Data =
         with
         static member calibrated members setPosition = Calibrate (members |> setPosition)
 
+    module Setup =
+        let randomPosition() = coords(5 + random.Next 29 |> float, 5 + random.Next 29 |> float)
+        let randomInitialPosition members : _ GroupSetup =
+            {   members = members
+                // we'll use the middle 30 x 30 as the default center instead of the whole 40 x 40 area
+                center = randomPosition()
+                radius = None
+                }
+
+        let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
+        let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
+
+
     [<AutoOpen>]
     module CombatAtoms =
         type Logged =

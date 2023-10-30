@@ -47,7 +47,7 @@ let update msg model =
     | Clear side ->
         let clearSide = function
             | SideA -> { model.fightSetup with sideA = [] }
-            | SideB -> { model.fightSetup with sideB = Team.freshCalibrated() }
+            | SideB -> { model.fightSetup with sideB = Setup.freshCalibrated() }
         { model with fightSetup = clearSide side }
     | Upsert creature ->
         if creature.name |> String.isntWhitespace then
@@ -73,8 +73,8 @@ let init () =
     let fight =
         UI.LocalStorage.AutofightSetup.read (fun _ ->
             {
-            sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Team.fresh
-            sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Team.randomInitialPosition
+            sideA = [2, "Stone Golem"; 1, "Peshkali"] |> Setup.fresh
+            sideB = Opposition.calibrated (Some "Ogre", None, None, TPK) Setup.randomInitialPosition
             })
     { page = Fight; fightSetup = fight; database = db; execution = NotStarted }
 

@@ -459,15 +459,3 @@ let createCombat (db: Map<string, Stats>) (team1: TeamSetup) team2 =
 let loggedOnly = List.choose (function Some (Unlogged _), _ -> None | Some (Logged msg), aug -> Some(Some msg, aug.combat) | None, aug -> Some(None, aug.combat))
 
 
-module Team =
-    let randomInitialPosition members : _ GroupSetup =
-        let yards n = float n * 1.<yards>
-        {   members = members
-            // we'll use the middle 30 x 30 as the default center instead of the whole 40 x 40 area
-            center = (5 + random.Next 29 |> yards, 5 + random.Next 29 |> yards)
-            radius = None
-            }
-
-    let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
-    let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
-

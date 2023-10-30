@@ -61,12 +61,12 @@ let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
     let readyToSubmit = party.Length > 0
     let submit _ =
         if readyToSubmit then
-            let group = {
-                members = (teamNumber, party)
+            let groups = party |> List.map (fun char -> {
+                members = (teamNumber, [char])
                 radius = None
-                center = coords(0., 0.) // we'll change this later, during Setup mode
-                }
-            dispatch (ChangeSetup (fun setup -> (setup |> List.filter (fun { members = (teamNumber', _) } -> teamNumber' <> teamNumber)) @ [group]))
+                center = Setup.randomPosition() // we'll change this later, during Setup mode
+                })
+            dispatch (ChangeSetup (fun setup -> (setup |> List.filter (fun { members = (teamNumber', _) } -> teamNumber' <> teamNumber)) @ groups))
             next()
     let partyDisplay = Html.div [
         let partyRows = [

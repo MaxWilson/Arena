@@ -138,7 +138,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             | Domain.Parser.Creature (v, Packrat.End) -> v
             | v -> shouldntHappen()
         let db = [parse "Minotaur: ST 23 Berserk Auto"] |> List.map (fun c -> c.name, c) |> Map.ofList
-        let c = createCombat db (Team.fresh [(1, "Minotaur")]) (Team.fresh [(1, "Minotaur")]) |> fun c -> c.combat
+        let c = createCombat db (Setup.fresh [(1, "Minotaur")]) (Setup.fresh [(1, "Minotaur")]) |> fun c -> c.combat
         verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.is Berserk) @>
 
     testCase "Resourcing spot-checks" <| fun() ->

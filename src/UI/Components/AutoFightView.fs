@@ -440,7 +440,7 @@ let View (settings, header) (model: Model) dispatch =
                                 let addToSideA monsterName fightSetup =
                                     // add a new group, even if the current monster exists within an existing group, so they can be placed in different locations
                                     { fightSetup with
-                                        sideA = fightSetup.sideA@([1, monsterName] |> Team.fresh)
+                                        sideA = fightSetup.sideA@([1, monsterName] |> Setup.fresh)
                                         }
                                 MonsterPicker (model.database, model.fightSetup.sideA.IsEmpty) <|
                                     ("Add", addToSideA >> ChangeFightSetup >> dispatch, SideA, dispatch) <|
@@ -471,7 +471,7 @@ let View (settings, header) (model: Model) dispatch =
                                             match fight.sideB with
                                             | Specific (({ members = (quantity, name)::_ } as group)::_) ->
                                                 Calibrate { members = (Some name, None, None, TPK); center = group.center; radius = group.radius }
-                                            | Specific _ -> Team.freshCalibrated()
+                                            | Specific _ -> Setup.freshCalibrated()
                                             | Calibrate({ members = Some name, _, _, _} as group) -> Specific [{ members = [(1, name)]; center = group.center; radius = group.radius }]
                                             | _ -> Specific []
                                         }
@@ -490,7 +490,7 @@ let View (settings, header) (model: Model) dispatch =
                                     let addToSideB monsterName fightSetup =
                                         // add a new group, even if the current monster exists within an existing group, so they can be placed in different locations
                                         { fightSetup with
-                                            sideB = Specific (sideB@([1, monsterName] |> Team.fresh))
+                                            sideB = Specific (sideB@([1, monsterName] |> Setup.fresh))
                                             }
 
                                     MonsterPicker (model.database, sideB.IsEmpty) ("Add", addToSideB >> ChangeFightSetup >> dispatch, SideB, dispatch) <| React.fragment [
