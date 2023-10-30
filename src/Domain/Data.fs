@@ -236,22 +236,24 @@ module Data =
 
         override this.ToString() =
             // e.g. "Daedelus Flavius, the Accursed, Male Human from Mordor"
-            let sexRace =
-                match this.sex, this.race with
-                | (Male | Female) as sex, Some race -> Some $"{sex} {race}"
-                | (Male | Female) as sex, None -> Some $"{sex}"
-                | Neither, Some race -> Some $"Neuter {race}"
-                | Neither, None -> None // if there's no mention of race OR gender we omit them both entirely. This isn't a well-considered decision and we may revisit it at some point but for now it's an easy way to avoid grammar ambiguity.
-            // maybe we could have factored this to be more programmatic and less explicit, but I think in this case it's more readable when it's explicit
-            match this.title, sexRace, this.nationalOrigin with
-            | Some title, Some sexRace, Some nation -> $"{this.personalName}, {title}, {sexRace}, from {nation}"
-            | Some title, Some sexRace, None -> $"{this.personalName}, {title}, {sexRace}"
-            | Some title, None, Some nation -> $"{this.personalName}, {title}, from {nation}"
-            | Some title, None, None -> $"{this.personalName}, {title}"
-            | None, Some sexRace, Some nation -> $"{this.personalName}, {sexRace}, from {nation}"
-            | None, Some sexRace, None -> $"{this.personalName}, {sexRace}"
-            | None, None, Some nation -> $"{this.personalName}, from {nation}"
-            | None, None, None -> $"{this.personalName}"
+            let sexRaceNation =
+                match this.sex, this.race, this.nationalOrigin with
+                | (Male | Female) as sex, Some race, Some nation -> Some $"{sex} {race} from {nation}"
+                | (Male | Female) as sex, Some race, None -> Some $"{sex} {race}"
+                | (Male | Female) as sex, None, Some nation -> Some $"{sex} from {nation}"
+                | (Male | Female) as sex, None, None -> Some $"{sex}"
+                | Neither, Some race, Some nation -> Some $"Neuter {race} from {nation}"
+                | Neither, Some race, None -> Some $"Neuter {race}"
+                | Neither, None, Some nation -> Some $"from {nation}" // if there's no mention of race OR gender we omit them both entirely. This isn't a well-considered decision and we may revisit it at some point but for now it's an easy way to avoid grammar ambiguity.
+                | Neither, None, None -> None
+            // maybe we could have factored this to be more programmatic and less explicit, but I think in this case it's slightly more readable when it's explicit
+            match this.title, sexRaceNation with
+            | Some title, Some suffix when title.StartsWith "the" -> $"{this.personalName} {title}, {suffix}"
+            | Some title, Some suffix -> $"{this.personalName}, {title}, {suffix}"
+            | Some title, None when title.StartsWith "the" -> $"{this.personalName} {title}"
+            | Some title, None -> $"{this.personalName}, {title}"
+            | None, Some suffix -> $"{this.personalName}, {suffix}"
+            | None, None -> $"{this.personalName}"
 
     type History = {
         kills: Map<Name, int>
