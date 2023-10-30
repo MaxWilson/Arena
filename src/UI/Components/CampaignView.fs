@@ -44,8 +44,8 @@ let SideView teamNumber dispatch =
     """
 
 [<ReactComponent>]
-let PartyPicker (model:Model, teamNumber, title, dispatch) =
-    let party, setParty = React.useState []
+let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
+    let party, setParty = React.useState (model.currentEncounterSetup |> Setup.enumerateMembers |> List.choose (function (_, _, otherTeamNumber, Individual char ) when otherTeamNumber = teamNumber -> Some (Individual char) | _ -> None))
     let filter, setFilter = React.useStateWithDependencies (thunk "") model.roster
     let (draft: string option), setDraft = React.useState None
     let isCharacter id = function
@@ -57,9 +57,7 @@ let PartyPicker (model:Model, teamNumber, title, dispatch) =
         else setParty (party |> List.filter (isCharacter charSheet.id >> not))
     let enemies =
         model.currentEncounterSetup |> Setup.enumerateMembers
-        |> List.choose (function (_, _, otherTeamNumber, Individual { id = id }) when teamNumber <> otherTeamNumber -> Some id | _ -> None)
-    let exceptEnemies =
-        List.filter (fun r -> not (party |> List.exists (function Individual char -> List.contains char.id enemies | _ -> false)))
+        |> List.choose (function (_, _, otherTeamNumber, Individual { id = id }) when otherTeamNumber <> teamNumber -> Some id | _ -> None)
     let readyToSubmit = party.Length > 0
     let submit _ =
         if readyToSubmit then
@@ -68,10 +66,12 @@ let PartyPicker (model:Model, teamNumber, title, dispatch) =
                 radius = None
                 center = coords(0., 0.) // we'll change this later, during Setup mode
                 }
-            dispatch (ChangeSetup (fun setup -> setup @ [group]))
-            dispatch (SetMode ChooseOpposition)
+            dispatch (ChangeSetup (fun setup -> (setup |> List.filter (fun { members = (teamNumber', _) } -> teamNumber' <> teamNumber)) @ [group]))
+            next()
     let partyDisplay = Html.div [
         let partyRows = [
+            let exceptEnemies lst =
+                lst |> List.filter (fun char -> enemies |> List.contains char.id |> not)
             for r in model.roster |> exceptEnemies do
                 let id = $"chk_{r.id}"
                 let isChecked = party |> List.exists (isCharacter r.id)
@@ -88,10 +88,10 @@ let PartyPicker (model:Model, teamNumber, title, dispatch) =
         class' "partyDisplay" Html.table [
             Html.tbody partyRows
             ]
-        if readyToSubmit then
-            Html.div [
-                Html.button [prop.text "Start"; prop.onClick submit]
-                ]
+        Html.div [
+            Html.button [prop.text "Back"; prop.onClick (defaultArg back ignore); if Option.isNone back then prop.disabled true]
+            Html.button [prop.text "OK"; prop.onClick submit; if not readyToSubmit then prop.disabled true]
+            ]
         ]
     // React says you have to call the same hooks no matter what is rendered, so we ensure this
     let withListener listeners body =
@@ -162,33 +162,78 @@ let PartyPicker (model:Model, teamNumber, title, dispatch) =
 
 [<ReactComponent>]
 let PartyDisplay (title: string, model, teams, dispatch) =
-    let txt = (String.oxfordJoin [
-        for address, group, team, entry in model.currentEncounterSetup |> Setup.enumerateMembers do
-            match entry with
-            | Individual char -> char.rp.personalName
-            | Group (quantity, name) ->
-                let m = model.monsters.catalog[name]
-                (m.Quantify(quantity))
-        ])
-    Html.div [Html.b [Html.text title]; Html.text txt]
+    let getTeam (_,_,team,_) = team
+    let teams = model.currentEncounterSetup |> Setup.enumerateMembers |> List.groupBy getTeam
+    let describe (team, lst) =
+        let txt = (String.oxfordJoin [
+            for address, group, team, entry in lst do
+                match entry with
+                | Individual char -> char.rp.personalName
+                | Group (quantity, name) ->
+                    let m = model.monsters.catalog[name]
+                    (m.Quantify(quantity))
+            ])
+        classTxt' (if team = 0 then "teamBlue" else "teamPurple") Html.span txt
+    class' "partyDisplay" Html.div [
+        Html.b [
+            Html.text title
+            ]
+        for (team, lst) in teams do
+            if team > 0 then Html.b " vs. "
+            describe (team, lst)
+        ]
+
+let SetupView (model: Model, back, submit, dispatch) =
+    let notifyTeamMoved ((groupIx, _subgroupIx), (x: float<yards>, y: float<yards>)) =
+        let x, y = Ops.round x, Ops.round y
+        let moveGroup (setup: Setup) =
+            setup
+            |> List.mapi (fun ix group ->
+                if ix = groupIx then
+                    { group with center = (x, y ) }
+                else group)
+        ChangeSetup moveGroup |> dispatch
+    let db = model.monsters
+    let groups = [
+        for address, group, teamNumber, members' in Setup.enumerateMembers model.currentEncounterSetup do
+            match members' with
+            | Individual char -> address, teamNumber, (char: CharacterSheet).rp.personalName, group.center, 0.5<yards>
+            | Group(quantity, name) ->
+                let m = db.catalog[name]
+                let memberCount = members' |> (function Individual _ -> 1 | Group (quantity, _) -> quantity)
+                address, teamNumber, m.Quantify quantity, group.center, Domain.CombatRules.radius_ (group, thunk memberCount)
+        ]
+    Html.div [
+        ArenaView.Setup(groups, notifyTeamMoved, dispatch)
+        Html.div [
+            Html.button [prop.text "Back"; prop.onClick back]
+            Html.button [prop.text "OK"; prop.onClick submit]
+            ]
+        ]
+
 
 [<ReactComponent>]
 let Campaign(header: ReactElement) =
     let (model: Model), dispatch = React.useElmishSimple init update
     let n, setN = React.useState 1
+    let goto mode _ = dispatch (SetMode mode)
     class' "campaign" Html.div [
         header
         Html.h4 [Html.i "(Under construction)"]
         match model.mode with
         | ChooseParty ->
-            PartyPicker(model, 0, "Choose Your Party", dispatch)
+            PartyPicker(model, 0, "Choose Your Party", None, goto ChooseOpposition, dispatch)
         | ChooseOpposition ->
             PartyDisplay("Party: ", model, [0], dispatch)
-            PartyPicker(model, 0, "Choose Enemies", dispatch)
+            PartyPicker(model, 1, "Choose Enemies", Some (goto ChooseParty), goto SetupEncounter, dispatch)
+        | SetupEncounter ->
+            PartyDisplay("Party: ", model, [0;1], dispatch)
+            SetupView(model, goto ChooseOpposition, goto Adventure, dispatch)
         | _ ->
             JSX.jsx $"""
                 <div>Campaign
                     TODO: {model.mode.ToString()} mode
+                    <button onClick={goto SetupEncounter}>Back</button>
                 </div>
                 """
             |> React.ofJsx

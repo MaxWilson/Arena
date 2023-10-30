@@ -16,7 +16,6 @@ module Setup =
                     yield address, group, teamNumber, member1
             ]
 
-
 let createCombat (db: Map<string, Stats>) (teams: Setup) =
     let mutable geo = Geo.ofList []
     let radius_ (group: _ GroupSetup) =

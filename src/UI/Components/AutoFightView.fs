@@ -579,7 +579,24 @@ let View (settings, header) (model: Model) dispatch =
                                         // in this case ignore groupIx
                                         { f with sideB = Calibrate { group with center = (x, y) } }
                                 ChangeFightSetup changeTeamSetup |> dispatch
-                            ArenaView.Setup model.database (model.fightSetup, notifyTeamMoved) dispatch
+                            let db = model.database
+                            let setup = model.fightSetup
+                            let groups = [
+                                let specifics isTeamA (side: GroupSetup list) = [
+                                    for ix, group in side |> List.mapi Tuple2.create do
+                                        for n, monsterName in group.members do
+                                            let c = db.catalog[monsterName]
+                                            (isTeamA, ix), (if isTeamA then 0 else 1), c.Quantify n, group.center, Domain.CombatRules.radius_ (group, memberCount)
+                                    ]
+                                yield! (setup.sideA |> specifics true)
+                                match setup.sideB with
+                                | Specific sideB -> yield! specifics false sideB
+                                | Calibrate ({ members = (Some name, _, _, _) } as group) ->
+                                    let c = db.catalog[name]
+                                    (false, 0), 1, $"N {c.PluralName_}", group.center, 5.<yards>
+                                | Calibrate _ -> ()
+                                ]
+                            ArenaView.Setup(groups, notifyTeamMoved, dispatch)
                             ]
 
                         ExecuteButton model dispatch

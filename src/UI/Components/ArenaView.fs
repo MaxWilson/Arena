@@ -104,26 +104,11 @@ module private Impl =
     let isMultitouch ev = ev?evt && ev?evt?touches && ev?evt?touches?length > 1
 
 [<ReactComponent>]
-let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch =
+let Setup (groups, onDrag, dispatch) =
     display (320, 320) (thunk []) <| fun r -> [
         layoutGrid r
         Layer.createNamed "teams" [
-            let groups = [
-                let specifics isTeamA (side: GroupSetup list) = [
-                    for ix, group in side |> List.mapi Tuple2.create do
-                        for n, monsterName in group.members do
-                            let c = db.catalog[monsterName]
-                            (isTeamA, ix), c.Quantify n, group.center, Domain.CombatRules.radius_ group
-                    ]
-                yield! (setup.sideA |> specifics true)
-                match setup.sideB with
-                | Specific sideB -> yield! specifics false sideB
-                | Calibrate ({ members = (Some name, _, _, _) } as group) ->
-                    let c = db.catalog[name]
-                    (false, 0), $"N {c.PluralName_}", group.center, 5.<yards>
-                | Calibrate _ -> ()
-                ]
-            for ((isTeamA, _) as groupAddress: bool * int, label, center, radius) in groups do
+            for (groupAddress, teamNumber, label:string, center, radius) in groups do
                 r.group $"Group{groupAddress}" center [
                     Group.draggable
                     Group.onDragEnd(fun e -> onDrag(groupAddress, (r.unscaleX (e.target.x()), r.unscaleY (e.target.y()))))
@@ -132,7 +117,7 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
                     Group.children [|
                         circle [
                             Circle.radius (r.scaleX radius)
-                            Circle.fill (if isTeamA then Color.Blue else Color.Purple)
+                            Circle.fill (if teamNumber = 0 then Color.Blue else Color.Purple)
                             Circle.key "outline"
                             ]
                         text [
@@ -151,7 +136,6 @@ let Setup (db: Domain.Data.MonsterDatabase) (setup: FightSetup, onDrag) dispatch
                             Text.text label
                             ]
                         |]
-
                     ]
             ]
         ]

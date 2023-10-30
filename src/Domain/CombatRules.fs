@@ -400,13 +400,16 @@ let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) = async {
     return! loop 1
     }
 
-let radius_ (group: _ GroupSetup) =
+let memberCount (group: ((int * _) list) GroupSetup) =
+    group.members |> List.sumBy fst
+
+let radius_ (group: _ GroupSetup, memberCount) =
     match group.radius with
     | Some r -> r
     | None ->
         // we want it full but not THAT full
-        let memberCount = group.members |> List.sumBy fst
-        1.0<yards> * (sqrt (float memberCount))
+        let count = memberCount group
+        1.0<yards> * (sqrt (float count))
 
 let toCombatants (db: Map<string, Stats>) teamNumber project =
     // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
@@ -426,7 +429,7 @@ let toCombatants (db: Map<string, Stats>) teamNumber project =
 let createCombat (db: Map<string, Stats>) (team1: TeamSetup) team2 =
     let mutable geo = Geo.ofList []
     let place (group: GroupSetup) (combatant: Combatant) =
-        let center, radius = group.center, radius_ group
+        let center, radius = group.center, radius_ (group, memberCount)
         let gen (radius: float<yards>) =
             let angleRadians = random.NextDouble() * 2. * System.Math.PI
             let radius = random.NextDouble() * radius
