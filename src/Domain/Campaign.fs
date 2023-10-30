@@ -5,15 +5,13 @@ type Name = Character of string | Monster of string
 type Roster = CharacterSheet list
 type IndividualOrGroup = Individual of CharacterSheet | Group of int * monsterName: string
 type TeamNumber = int
-type Setup = (TeamNumber * IndividualOrGroup list) GroupSetup list
+type Setup = (TeamNumber * IndividualOrGroup) GroupSetup list
 
 module Setup =
     let enumerateMembers setup =
-        [   for ix, group in setup |> List.mapi Tuple2.create do
-                let teamNumber, members = group.members
-                for ix2, member1 in members |> List.mapi Tuple2.create do
-                    let address = ix, ix2
-                    yield address, group, teamNumber, member1
+        [   for ix, ({ members = (teamNumber, member') } as group) in setup |> List.mapi Tuple2.create do
+                let address = ix
+                yield address, group, teamNumber, member'
             ]
 
 let createCombat (db: Map<string, Stats>) (teams: Setup) =
@@ -21,7 +19,7 @@ let createCombat (db: Map<string, Stats>) (teams: Setup) =
     let radius_ (group: _ GroupSetup) =
         group.radius |> Option.defaultWith (fun () ->
             let _, members = group.members
-            let memberCount = members |> List.sumBy (function Individual _ -> 1 | Group (quantity, _) -> quantity)
+            let memberCount = members |> (function Individual _ -> 1 | Group (quantity, _) -> quantity)
             1.0<yards> * (sqrt (float memberCount)))
     let place (group: _ GroupSetup) (combatant: Combatant) =
         let center, radius = group.center, radius_ group
@@ -46,17 +44,16 @@ let createCombat (db: Map<string, Stats>) (teams: Setup) =
         let mutable perMonsterCounter = Map.empty
         fun (lst: Setup) ->
             [   for group in lst do
-                    let teamNumber, members' = group.members
-                    for member' in members' do
-                        match member' with
-                        | Individual _ -> notImpl()
-                        | Group (quantity, name) ->
-                            for i in 1..quantity do
-                                let stats = db[name]
-                                let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
-                                yield Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, stats) |> project group
-                            counter <- counter + quantity
-                            perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
+                    let teamNumber, member' = group.members
+                    match member' with
+                    | Individual _ -> notImpl()
+                    | Group (quantity, name) ->
+                        for i in 1..quantity do
+                            let stats = db[name]
+                            let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
+                            yield Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, stats) |> project group
+                        counter <- counter + quantity
+                        perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
                 ]
     let setup = teams |> (toCombatants db place)
     let combatants = setup |> List.map (fun (c, _) -> c.Id, c) |> Map.ofList

@@ -59,7 +59,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
                 radius = Some 0.<yards>
                 }]
         // we don't care who's in the combat as long as there's someone on both sides and they're in range of each other
-        let combat = createCombat (["Bob", Stats.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] (0.<yards>, 1.<yards>)) |> fun c -> c.combat
+        let combat = createCombat (["Bob", Stats.create "Bob"] |> Map.ofList) (teamOf (1, "Bob") (0.<yards>, 0.<yards>)) (teamOf (1, "Bob") (0.<yards>, 1.<yards>)) |> fun c -> c.combat
 
         let bob = combat.combatants.Keys |> Seq.head
         let toCtx combat = { me = bob; combat = combat }
@@ -93,7 +93,7 @@ let Tests = testLabel "Unit" <| testList "Behavior" [
                 }]
         // we don't care who's in the combat as long as there's someone on both sides and they're in range of each other
         let combatAt pos =
-            let c = createCombat (["Bob", Stats.create "Bob"] |> Map.ofList) (teamOf [1, "Bob"] (0.<yards>, 0.<yards>)) (teamOf [1, "Bob"] pos) |> fun c -> c.combat
+            let c = createCombat (["Bob", Stats.create "Bob"] |> Map.ofList) (teamOf (1, "Bob") (0.<yards>, 0.<yards>)) (teamOf (1, "Bob") pos) |> fun c -> c.combat
             let actual = c.geo.Find (2, "Bob")
             verify <@ pos = actual @>
             c

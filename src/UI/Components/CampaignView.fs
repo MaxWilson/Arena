@@ -62,7 +62,7 @@ let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
     let submit _ =
         if readyToSubmit then
             let groups = party |> List.map (fun char -> {
-                members = (teamNumber, [char])
+                members = (teamNumber, char)
                 radius = None
                 center = Setup.randomPosition() // we'll change this later, during Setup mode
                 })
@@ -184,7 +184,7 @@ let PartyDisplay (title: string, model, teams, dispatch) =
         ]
 
 let SetupView (model: Model, back, submit, dispatch) =
-    let notifyTeamMoved ((groupIx, _subgroupIx), (x: float<yards>, y: float<yards>)) =
+    let notifyTeamMoved (groupIx, (x: float<yards>, y: float<yards>)) =
         let x, y = Ops.round x, Ops.round y
         let moveGroup (setup: Setup) =
             setup

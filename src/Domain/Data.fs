@@ -408,7 +408,7 @@ module Data =
         center: Coords
         radius: Distance option
         }
-    type GroupSetup = ((int * string) list) GroupSetup
+    type GroupSetup = (int * string) GroupSetup
     type TeamSetup = GroupSetup list
     type DefeatCriteria =
         | TPK
@@ -429,7 +429,7 @@ module Data =
                 radius = None
                 }
 
-        let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition [m])
+        let fresh (monsters: (int * string) list): TeamSetup = monsters |> List.map (fun m -> randomInitialPosition m)
         let freshCalibrated() = Opposition.calibrated (None, None, None, TPK) randomInitialPosition
 
 

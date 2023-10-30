@@ -416,24 +416,22 @@ let View (settings, header) (model: Model) dispatch =
                                             if ix = groupIndex then
                                                 let members' =
                                                     group.members
-                                                    |> List.map (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
-                                                    |> List.filter (fun (quantity, _) -> quantity > 0)
+                                                    |> (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
                                                 { group with members = members' }
                                             else group
                                         )
-                                    |> List.filter (fun group -> group.members.Length > 0)
+                                    |> List.filter (fun group -> fst group.members > 0)
                             let setQuantity (side: TeamSetup) (groupIndex: int, name: string) q =
                                 side |> List.mapi (
                                         fun ix group ->
                                             if ix = groupIndex then
                                                 let members' =
                                                     group.members
-                                                    |> List.map (function (_, name') when name = name' -> (q, name) | otherwise -> otherwise)
-                                                    |> List.filter (fun (quantity, _) -> quantity > 0)
+                                                    |> (function (_, name') when name = name' -> (q, name) | otherwise -> otherwise)
                                                 { group with members = members' }
                                             else group
                                         )
-                                    |> List.filter (fun group -> group.members.Length > 0)
+                                    |> List.filter (fun group -> fst group.members > 0)
                             class' "specificQuantity" Html.div [
                                 let changeQuantity address delta fightSetup = { fightSetup with sideA = changeQuantity fightSetup.sideA address delta }
                                 let setQuantity address delta fightSetup = { fightSetup with sideA = setQuantity fightSetup.sideA address delta }
@@ -449,12 +447,12 @@ let View (settings, header) (model: Model) dispatch =
                                             | [] -> Html.text "No creatures selected"
                                             | sideA ->
                                                 for ix, group in sideA |> List.mapi Tuple2.create do
-                                                    for quantity, name in group.members do
-                                                        Html.div [
-                                                            Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) +1)))]
-                                                            Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) -1)))]
-                                                            editLink (Some quantity) name (fun q -> dispatch (ChangeFightSetup (setQuantity (ix, name) q)))
-                                                            ]
+                                                    let quantity, name = group.members
+                                                    Html.div [
+                                                        Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) +1)))]
+                                                        Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFightSetup (changeQuantity (ix, name) -1)))]
+                                                        editLink (Some quantity) name (fun q -> dispatch (ChangeFightSetup (setQuantity (ix, name) q)))
+                                                        ]
                                             ]
                                 ]
                             Html.text "vs."
@@ -469,10 +467,10 @@ let View (settings, header) (model: Model) dispatch =
                                             // if there's at least one non-empty group, default to it. User will change it if they want to.
                                             // preserve positioning if possible so user can toggle back and forth without disruption.
                                             match fight.sideB with
-                                            | Specific (({ members = (quantity, name)::_ } as group)::_) ->
+                                            | Specific (({ members = (quantity, name) } as group)::_) ->
                                                 Calibrate { members = (Some name, None, None, TPK); center = group.center; radius = group.radius }
                                             | Specific _ -> Setup.freshCalibrated()
-                                            | Calibrate({ members = Some name, _, _, _} as group) -> Specific [{ members = [(1, name)]; center = group.center; radius = group.radius }]
+                                            | Calibrate({ members = Some name, _, _, _} as group) -> Specific [{ members = (1, name); center = group.center; radius = group.radius }]
                                             | _ -> Specific []
                                         }
                                 match model.fightSetup.sideB with
@@ -500,12 +498,12 @@ let View (settings, header) (model: Model) dispatch =
                                         | [] -> Html.text "No creatures selected"
                                         | sideB ->
                                             for ix, group in sideB |> List.mapi Tuple2.create do
-                                                for quantity, name in group.members do
-                                                    Html.div [
-                                                        Html.button [prop.text "+"; onClick (changeQuantity (ix, name) +1)]
-                                                        Html.button [prop.text "-"; onClick (changeQuantity (ix, name) -1)]
-                                                        editLink (Some quantity) name (setQuantity (ix, name) >> ChangeFightSetup >> dispatch)
-                                                        ]
+                                                let quantity, name = group.members
+                                                Html.div [
+                                                    Html.button [prop.text "+"; onClick (changeQuantity (ix, name) +1)]
+                                                    Html.button [prop.text "-"; onClick (changeQuantity (ix, name) -1)]
+                                                    editLink (Some quantity) name (setQuantity (ix, name) >> ChangeFightSetup >> dispatch)
+                                                    ]
                                         ]
                                 | Calibrate({ members = (name, min, max, defeatCriteria) } as setup) ->
                                     let setSideB f fightSetup =
@@ -584,9 +582,9 @@ let View (settings, header) (model: Model) dispatch =
                             let groups = [
                                 let specifics isTeamA (side: GroupSetup list) = [
                                     for ix, group in side |> List.mapi Tuple2.create do
-                                        for n, monsterName in group.members do
-                                            let c = db.catalog[monsterName]
-                                            (isTeamA, ix), (if isTeamA then 0 else 1), c.Quantify n, group.center, Domain.CombatRules.radius_ (group, memberCount)
+                                        let n, monsterName = group.members
+                                        let c = db.catalog[monsterName]
+                                        (isTeamA, ix), (if isTeamA then 0 else 1), c.Quantify n, group.center, Domain.CombatRules.radius_ (group, memberCount)
                                     ]
                                 yield! (setup.sideA |> specifics true)
                                 match setup.sideB with
@@ -609,7 +607,7 @@ let View (settings, header) (model: Model) dispatch =
                         let db = model.database
                         let teamToTxt team =
                             team
-                            |> List.collect (fun group -> group.members)
+                            |> List.map (fun group -> group.members)
                             |> List.map (
                                 function
                                 | (1, name) -> $"1 {name}"

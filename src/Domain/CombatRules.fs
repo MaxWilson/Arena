@@ -400,8 +400,8 @@ let fight (cqrs: CQRS.CQRS<_,AugmentedCombat>) = async {
     return! loop 1
     }
 
-let memberCount (group: ((int * _) list) GroupSetup) =
-    group.members |> List.sumBy fst
+let memberCount (group: (int * _) GroupSetup) =
+    group.members |> fst
 
 let radius_ (group: _ GroupSetup, memberCount) =
     match group.radius with
@@ -417,13 +417,13 @@ let toCombatants (db: Map<string, Stats>) teamNumber project =
     let mutable perMonsterCounter = Map.empty
     fun (team: TeamSetup) ->
         [   for group in team do
-                for quantity, name in group.members do
-                    for i in 1..quantity do
-                        let stats = db[name]
-                        let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
-                        yield Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, stats) |> project group
-                    counter <- counter + quantity
-                    perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
+                let quantity, name = group.members
+                for i in 1..quantity do
+                    let stats = db[name]
+                    let prev = defaultArg (perMonsterCounter.TryFind name) 0 // if there are multiple groups of e.g. 1 orc and 1 orc, the second group should start at Orc 2 not "Orc"
+                    yield Combatant.fresh(teamNumber, (if prev + quantity > 1 then $"{name} {prev + i}" else name), counter + i, stats) |> project group
+                counter <- counter + quantity
+                perMonsterCounter <- perMonsterCounter |> Map.add name (defaultArg (perMonsterCounter.TryFind name) 0 + quantity)
             ]
 
 let createCombat (db: Map<string, Stats>) (team1: TeamSetup) team2 =

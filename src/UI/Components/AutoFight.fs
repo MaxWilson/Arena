@@ -151,7 +151,7 @@ let calibrate inform (db: Map<_,Stats>) (team1: TeamSetup) (center: Coords, radi
     let runForN n run = async {
         inform $"Evaluating vs. {enemyStats.Quantify n} ({run}/10)"
         do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
-        let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
+        let combat = createCombat db team1 [{ members = (n, enemyType); center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
         let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
         let! fightResult = fight cqrs
         return cqrs, fightResult
@@ -204,7 +204,7 @@ let calibrate inform (db: Map<_,Stats>) (team1: TeamSetup) (center: Coords, radi
     match! findRange eval (Some 100) with
     | min, max ->
         let n = max
-        let combat = createCombat db team1 [{ members = [n, enemyType ]; center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
+        let combat = createCombat db team1 [{ members = (n, enemyType); center = center; radius = radius }] // instantiate. TODO: instantiate at specific positions, as soon as monsters have positions.
         let cqrs = CQRS.CQRS.create(combat, CombatAtom.update)
         let! _ = fight cqrs // wait for the fight to terminate before querying CQRS
         let sampleFight = cqrs.LogWithMessages()
@@ -223,7 +223,7 @@ let beginFights (model: Model) dispatch =
             do! Async.Sleep 0 // yield the JS runtime  in case UI updates need to be processed
             try
                 match model.fightSetup.sideB with
-                | _ when (model.fightSetup.sideA |> List.every (fun group -> group.members |> List.sumBy fst = 0)) ->
+                | _ when (model.fightSetup.sideA |> List.every (fun group -> group.members |> fst = 0)) ->
                     Fighting NotStarted |> dispatch
                     informUserOfError "You have to pick monsters first"
                 | Calibrate({ members = None, _, _, _ }) ->
