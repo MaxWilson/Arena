@@ -58,6 +58,7 @@ let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
     let enemies =
         model.currentEncounterSetup |> Setup.enumerateMembers
         |> List.choose (function (_, _, otherTeamNumber, Individual { id = id }) when otherTeamNumber <> teamNumber -> Some id | _ -> None)
+    let addMonster _ = notImpl "Add Monster"
     let readyToSubmit = party.Length > 0
     let submit _ =
         if readyToSubmit then
@@ -84,7 +85,32 @@ let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
                             classP' "chooseParty" Html.textarea [prop.valueOrDefault r.draft; prop.disabled true]
                             ])
                         ]
-                ]
+            for group in model.currentEncounterSetup do
+                match group.members with
+                | _, Individual _ -> () // characters handled separately, above
+                | team, Group(quantity, monsterName) ->
+                    if team = teamNumber then
+                        let m = model.monsters.catalog[monsterName]
+                        class' "partyRow" Html.tr [
+                            Html.td [
+                                Html.button [prop.text "-"]
+                                Html.button [prop.text "+"]
+                                ]
+                            Html.td [
+                                Html.a [prop.text $"{m.Quantify quantity}"]
+                                ]
+                            ]
+            for m in model.monsters.catalog.Values do
+                if m.name.StartsWith(filter, System.StringComparison.InvariantCultureIgnoreCase) then
+                    class' "partyRow" Html.tr [
+                        Html.td [
+                            Html.button [prop.text "Add"; prop.onClick (fun _ -> addMonster m)]
+                            ]
+                        Html.td [
+                            Html.a [prop.text $"{m.name}"]
+                            ]
+                        ]
+            ]
         class' "partyDisplay" Html.table [
             Html.tbody partyRows
             ]
@@ -110,11 +136,15 @@ let PartyPicker (model:Model, teamNumber, title, back, next, dispatch) =
                 if e.ctrlKey then
                     submit()
                 else
-                match model.roster |> (List.filter
-                    (fun r -> r.rp.personalName.StartsWith(filter, System.StringComparison.InvariantCultureIgnoreCase))) with
-                | [r] ->
+                let matchesFilter (txt:string) = txt.StartsWith(filter, System.StringComparison.InvariantCultureIgnoreCase)
+                let matchingCharacters = model.roster |> (List.filter (fun r -> r.rp.personalName |> matchesFilter))
+                let matchingMonsters = model.monsters.catalog.Values |> List.ofSeq |> (List.filter (fun m -> m.name |> matchesFilter))
+                match matchingCharacters, matchingMonsters with
+                | [r], [] ->
                     let isChecked = party |> List.exists (isCharacter r.id)
                     toggle r isChecked
+                | [], [m] ->
+                    addMonster m
                 | _ -> ()
             elif e.key = "Escape" then
                 setFilter ""
