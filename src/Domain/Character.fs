@@ -60,13 +60,23 @@ module Parser =
         | CharacterName(txt, NameSegment(txt2, rest)) when txt2 <> "the" -> Some(txt + " " + txt2, rest)
         | NameSegment (txt, rest) -> Some(txt, rest)
         | _ -> None
+    let rec (|RestOfTitle|_|) = pack <| function
+        | RestOfTitle(txt, NameSegment(txt2, rest)) when txt2 <> "from" -> Some(txt + " " + txt2, rest)
+        | NameSegment (txt, rest) -> Some(txt, rest)
+        | _ -> None
+    let (|AppositiveTitle|_|) = function
+        | OWSStr "," (RestOfTitle(txt, rest)) -> Some(txt, rest)
+        | _ -> None
+    let (|NonAppositiveTitle|_|) = function
+        | OWSStr "the" (RestOfTitle(txt, rest)) -> Some("the " + txt, rest)
+        | _ -> None
     let (|Sex|_|) = function
         | OWSStr "Male" rest -> Some(Male, rest)
         | OWSStr "Female" rest -> Some(Female, rest)
         | OWSStr "Neuter" rest -> Some(Neither, rest)
         | _ -> None
     let rec (|Nation|_|) = pack <| function
-        | Nation(txt, NameSegment(txt2, rest)) when txt2 <> "the" -> Some(txt + " " + txt2, rest)
+        | Nation(txt, NameSegment(txt2, rest)) -> Some(txt + " " + txt2, rest)
         | NameSegment(txt, rest) -> Some(txt, rest)
         | _ -> None
     let (|NationalOrigin|_|) = function
@@ -78,30 +88,29 @@ module Parser =
         | NationalOrigin _ -> None
         | OWS (Chars validNameCharsNoComma (txt, rest)) -> Some(txt.Trim(), rest)
         | _ -> None
-    let rec (|Title|_|) = pack <| function
-        // we're generally pretty liberal about titles but we don't want to ever mistake "from Ermor"/"Female"/etc. for titles, which is a nation declaration, with a race.
-        | NationalOrigin _ | Sex _ -> None
-        | Title(txt, NameSegment(txt2, rest)) when txt2 <> "the" -> Some(txt + " " + txt2, rest)
-        | NameSegment (txt, rest) -> Some(txt.Trim(), rest)
-        | _ -> None
-    let (|SexAndRace|_|) = function
-        | Sex (sex, (Race (race, rest))) -> Some((sex, race), rest)
-        | _ -> None
     let (|Maybe|_|) delimiter (|Pattern|_|) = function
         | Str delimiter (OWS (Pattern(v, rest))) -> Some(Some v, rest)
         | rest -> Some(None, rest)
-
+    let (|SexRaceNation|_|) =
+        let (|SexRace|_|) = function
+            | Sex(sex, Race(race, rest)) -> Some ((Some sex, Some race), rest)
+            | Sex(sex, rest) -> Some ((Some sex, None), rest)
+            | Race(race, rest) -> Some ((None, Some race), rest)
+            | _ -> None
+        function
+        | OWSStr "," (SexRace((sex, race), NationalOrigin(nation, rest))) -> Some((sex, race, Some nation), rest)
+        | OWSStr "," (SexRace((sex, race), rest)) -> Some((sex, race, None), rest)
+        | Optional "," (NationalOrigin(nation, rest)) -> Some((None, None, Some nation), rest) // be tolerant of unneeded commas like in "Gandalf the White, from Undauntra"
+        | _ -> None
     let (|RoleplayingData|_|) =
         function
-        | CharacterName(name, Str "," (Title(title, Str "," (SexAndRace((sex, race), Maybe "" (|NationalOrigin|_|) (nation, rest)))))) ->
-            Some(RoleplayingData.create(name, ?sex=Some sex, race=race, title=title, ?nationalOrigin=nation), rest)
-        | CharacterName(name, Str "," (Title(title, Maybe "," (|Sex|_|) (sex, Maybe "" (|NationalOrigin|_|) (nation, rest))))) -> Some(RoleplayingData.create(name, ?sex=sex, title=title, ?nationalOrigin=nation), rest)
-        | CharacterName(name, Str "," (Title(title, Maybe "," (|Race|_|) (race, Maybe " " (|NationalOrigin|_|) (nation, rest))))) -> Some(RoleplayingData.create(name, ?race=race, title=title, ?nationalOrigin=nation), rest)
-        | CharacterName(name, Str "," (SexAndRace((sex, race), Maybe "" (|NationalOrigin|_|) (nation, rest)))) ->
-            Some(RoleplayingData.create(name, ?sex=Some sex, race=race, ?nationalOrigin=nation), rest)
-        | CharacterName(name, Maybe "," (|Sex|_|) (sex, Maybe "" (|NationalOrigin|_|) (nation, rest))) -> Some(RoleplayingData.create(name, ?sex=sex, ?nationalOrigin=nation), rest)
-        | CharacterName(name, Maybe "," (|Race|_|) (race, Maybe "" (|NationalOrigin|_|) (nation, rest))) -> Some(RoleplayingData.create(name, ?race=race, ?nationalOrigin=nation), rest)
-        | CharacterName(name, rest) -> Some(RoleplayingData.create(name), rest)
+        | CharacterName(name, SexRaceNation ((sex, race, nation), ((OWSStr ":" _) as rest))) ->
+            // use lookahead for ":" to ensure that "Lyron Barrister, King of Swords, Male Human from Ermor" does not match using "King" for Race
+            Some(RoleplayingData.create(name, ?sex=sex, ?race=race, ?title=None, ?nationalOrigin=nation), rest)
+        | CharacterName(name, NonAppositiveTitle(title, SexRaceNation ((sex, race, nation), rest))) ->
+            Some(RoleplayingData.create(name, ?sex=sex, ?race=race, ?title=Some title, ?nationalOrigin=nation), rest)
+        | CharacterName(name, AppositiveTitle(title, SexRaceNation ((sex, race, nation), rest))) ->
+            Some(RoleplayingData.create(name, ?sex=sex, ?race=race, ?title=Some title, ?nationalOrigin=nation), rest)
         | _ -> None
     let (|CharacterSheet|_|) = pack <| function
         | RoleplayingData(rp, OWSStr ":" (CreatureProperties(fprops, rest))) ->

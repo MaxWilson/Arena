@@ -252,6 +252,7 @@ module Data =
             | Some title, Some suffix -> $"{this.personalName}, {title}, {suffix}"
             | Some title, None when title.StartsWith "the" -> $"{this.personalName} {title}"
             | Some title, None -> $"{this.personalName}, {title}"
+            | None, Some suffix when this.sex = Neither && this.race.IsNone -> $"{this.personalName} {suffix}"
             | None, Some suffix -> $"{this.personalName}, {suffix}"
             | None, None -> $"{this.personalName}"
 
