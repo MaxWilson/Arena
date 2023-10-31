@@ -154,6 +154,7 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
             RoleplayingData.create("Lyron Barrister", "King of Swords", Male, "Human", "Tir na n'Og")
             RoleplayingData.create("Kimchi So Small", "Tiny Fury", Neither, nationalOrigin="Hamsterdam")
             RoleplayingData.create("Lyra Kell", Female)
+            RoleplayingData.create("Ethniu", nationalOrigin="Fomoria")
             RoleplayingData.create("Ung", race="Ogrilon", title="The Sharkfist")
             for i in 1..100 do
                 Domain.Character.Generate.randomly()

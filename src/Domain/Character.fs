@@ -57,7 +57,7 @@ module Parser =
         | OWS (Chars validNameCharsNoComma (txt, rest)) -> Some(txt.Trim(), rest)
         | _ -> None
     let rec (|CharacterName|_|) = pack <| function
-        | CharacterName(txt, NameSegment(txt2, rest)) when txt2 <> "the" -> Some(txt + " " + txt2, rest)
+        | CharacterName(txt, NameSegment(txt2, rest)) when txt2 <> "the" && txt2 <> "from" -> Some(txt + " " + txt2, rest)
         | NameSegment (txt, rest) -> Some(txt, rest)
         | _ -> None
     let rec (|RestOfTitle|_|) = pack <| function
@@ -111,6 +111,8 @@ module Parser =
             Some(RoleplayingData.create(name, ?sex=sex, ?race=race, ?title=Some title, ?nationalOrigin=nation), rest)
         | CharacterName(name, AppositiveTitle(title, SexRaceNation ((sex, race, nation), rest))) ->
             Some(RoleplayingData.create(name, ?sex=sex, ?race=race, ?title=Some title, ?nationalOrigin=nation), rest)
+        | CharacterName(name, NationalOrigin (nation, rest)) ->
+            Some(RoleplayingData.create(name, nationalOrigin=nation), rest)
         | _ -> None
     let (|CharacterSheet|_|) = pack <| function
         | RoleplayingData(rp, OWSStr ":" (CreatureProperties(fprops, rest))) ->
