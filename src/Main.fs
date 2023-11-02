@@ -66,6 +66,8 @@ let Router() =
                 UI.Components.CampaignView.Campaign(header "Campaign")
             | [ "settings" ] ->
                 UI.Components.SettingsView.Settings(settings, header "Settings", changeSettings)
+            | [ "chargen" ] ->
+                UI.Components.ChargenView.View(settings, header "Settings")
             | otherwise ->
                 AutoFight(settings, header "Autofight")
             ]
