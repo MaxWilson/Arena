@@ -9,3 +9,4 @@
 #load @"Domain\Behavior.fs"
 #load @"Domain\CombatRules.fs"
 
+1+1

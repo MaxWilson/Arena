@@ -1,14 +1,19 @@
 module Domain.Character
 
-let randomNation _ = chooseRandom ["Tir na n'Og"; "Abysia"; "Kailasa"; "Ermor"; "Undauntra"; "Arboria"; "Mordor"]
+let randomNation _ = chooseRandom ["Tir na n'Og"; "Abysia"; "Kailasa"; "Ermor"; "Undauntra"; "Arboria"; "Mordor"; "Cimmeria"]
 
 let makeNameAndTitle (nationOfOrigin: string) (sex: Sex) =
-    let rec chooseFromLists =
-        function
-        | potentialCategory::rest ->
-            match Onomastikon.nameLists |> Map.tryFind (nationOfOrigin, potentialCategory) with
-            | Some nameList -> chooseRandom nameList
-            | None -> chooseFromLists rest
+    let (|Namelist|_|) = function
+        | [] -> None
+        | (potentialCategory::_) -> Onomastikon.nameLists |> Map.tryFind (nationOfOrigin, potentialCategory)
+    let (|NameFunction|_|) = function
+        | [] -> None
+        | (potentialCategory::_) -> Onomastikon.nameFunctions (nationOfOrigin, potentialCategory)
+    let rec chooseFromLists = function
+        | Namelist nameList -> chooseRandom nameList
+        | NameFunction f -> f()
+        | _::rest ->
+            chooseFromLists rest
         | [] -> "" // sometimes e.g. there is no last name for a given national origin
 
     // for Neither sex, we'll choose names haphazardly
